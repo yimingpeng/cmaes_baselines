@@ -9,5 +9,5 @@
 
 # Updates
 [28/5/2018]
-1. Tested on atari games, working properly.
-2. Add simple control problem (gym cartpole), tested, working properly
+1. Add simple control problem (gym cartpole), tested, working properly
+1. Add pybullet control problem (bullet control problems), tested, working properly

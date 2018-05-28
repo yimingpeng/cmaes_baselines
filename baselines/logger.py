@@ -362,6 +362,7 @@ def configure(dir=None, format_strs=None, log_suffix = ""):
     assert isinstance(dir, str)
     os.makedirs(dir, exist_ok=True)
 
+    log_suffix = "-"+log_suffix+"-"
     log_suffix += datetime.datetime.now().strftime("openai-%Y-%m-%d-%H-%M-%S-%f")
     from mpi4py import MPI
     rank = MPI.COMM_WORLD.Get_rank()
