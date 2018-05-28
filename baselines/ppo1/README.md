@@ -8,4 +8,6 @@
 
 
 # Updates
-Tested on 29 May 2018, working properly.
+[28/5/2018]
+1. Tested on atari games, working properly.
+2. Add simple control problem (gym cartpole), tested, working properly

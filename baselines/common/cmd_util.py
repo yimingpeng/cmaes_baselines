@@ -49,6 +49,17 @@ def make_robotics_env(env_id, seed, rank=0):
     env.seed(seed)
     return env
 
+def make_simple_control_env(env_id, seed):
+    """
+    Added by Yiming (29/5/2018)
+    Create a wrapped, monitored gym.Env for Simple Control Problems.
+    """
+    set_global_seeds(seed)
+    env = gym.make(env_id)
+    # env = Monitor(env, logger.get_dir(), allow_early_resets=True)
+    env.seed(seed)
+    return env
+
 def arg_parser():
     """
     Create an empty argparse.ArgumentParser.
@@ -84,5 +95,17 @@ def robotics_arg_parser():
     parser = arg_parser()
     parser.add_argument('--env', help='environment ID', type=str, default='FetchReach-v0')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--num-timesteps', type=int, default=int(1e6))
+    return parser
+
+def simple_ctrl_arg_parser():
+    """
+    Added by Yiming (29/5/2018)
+    Create an argparse.ArgumentParser for run_mujoco.py.
+    """
+    parser = arg_parser()
+    parser.add_argument('--env', help='environment ID', type=str,
+                        default="CartPole-v0")
+    parser.add_argument('--seed', help='RNG seed', type=int, default=1)
     parser.add_argument('--num-timesteps', type=int, default=int(1e6))
     return parser

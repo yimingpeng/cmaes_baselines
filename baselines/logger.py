@@ -347,16 +347,22 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None):
+def configure(dir=None, format_strs=None, log_suffix = ""):
+    # Modifed by Yiming (28/5/2018)
+    # 1. Changing the default log dir to current directory with name "logs"
+    # 2. Add log_suffix to configure which can used to distinguish log files, e.g. algorithms' names
+
+    # if dir is None:
+    #     dir = os.getenv('OPENAI_LOGDIR')
+    # if dir is None:
+    #     dir = osp.join(tempfile.gettempdir(),
+    #         datetime.datetime.now().strftime("openai-%Y-%m-%d-%H-%M-%S-%f"))
     if dir is None:
-        dir = os.getenv('OPENAI_LOGDIR')
-    if dir is None:
-        dir = osp.join(tempfile.gettempdir(),
-            datetime.datetime.now().strftime("openai-%Y-%m-%d-%H-%M-%S-%f"))
+        dir = "./logs/"
     assert isinstance(dir, str)
     os.makedirs(dir, exist_ok=True)
 
-    log_suffix = ''
+    log_suffix += datetime.datetime.now().strftime("openai-%Y-%m-%d-%H-%M-%S-%f")
     from mpi4py import MPI
     rank = MPI.COMM_WORLD.Get_rank()
     if rank > 0:
