@@ -85,3 +85,9 @@ To cite this repository in publications:
       journal = {GitHub repository},
       howpublished = {\url{https://github.com/openai/baselines}},
     }
+
+
+# New Updates by Yiming (yiming.peng@ecs.vuw.ac.nz)
+- [CMAES](baselines/cmaes)
+- [CMAES_Layer](baselines/cmaes_layer)
+- [PPO_CMAES](baselines/ppo_cmaes)
