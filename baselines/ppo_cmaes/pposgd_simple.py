@@ -15,60 +15,9 @@ from baselines.ppo_cmaes.cnn_policy import CnnPolicy
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 
 
-def traj_segment_generator_eval(pi, env, horizon, stochastic):
-    t = 0
-    ac = env.action_space.sample()  # not used, just so we have the datatype
-    new = True  # marks if we're on first timestep of an episode
-    ob = env.reset()
-
-    cur_ep_ret = 0  # return in current episode
-    cur_ep_len = 0  # len of current episode
-    ep_rets = []  # returns of completed episodes in this segment
-    ep_lens = []  # lengths of ...
-
-    # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
-    prevacs = acs.copy()
-
-    while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
-        # Slight weirdness here because we need value function at time T
-        # before returning segment [0, T-1] so we get the correct
-        # terminal value
-        if t > 0 and t % horizon == 0:
-            yield {"ob": obs, "rew": rews, "new": news,
-                   "ac": acs, "prevac": prevacs,
-                   "ep_rets": ep_rets, "ep_lens": ep_lens}
-            # Be careful!!! if you change the downstream algorithm to aggregate
-            # several of these batches, then be sure to do a deepcopy
-            ep_rets = []
-            ep_lens = []
-        i = t % horizon
-        obs[i] = ob
-        news[i] = new
-        acs[i] = ac
-        prevacs[i] = prevac
-
-        ob, rew, new, _ = env.step(ac)
-        rews[i] = rew
-
-        cur_ep_ret += rew
-        cur_ep_len += 1
-        if new:
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
-        t += 1
-
-
 def traj_segment_generator(pi, env, horizon, stochastic):
-    global timesteps_so_far, best_fitness
+    # Trajectories generators
+    global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
     new = True  # marks if we're on first timestep of an episode
@@ -90,7 +39,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(best_fitness)
+            result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -127,79 +76,10 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator_cmaes(pi, env, horizon, stochastic, eval_iters):
-    global timesteps_so_far, best_fitness
-    t = 0
-    ac = env.action_space.sample()  # not used, just so we have the datatype
-    new = True  # marks if we're on first timestep of an episode
-    ob = env.reset()
-
-    cur_ep_ret = 0  # return in current episode
-    cur_ep_len = 0  # len of current episode
-    ep_rets = []  # returns of completed episodes in this segment
-    ep_lens = []  # lengths of ...
-
-    # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    vpreds = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
-    prevacs = acs.copy()
-
-    ep_num = 0
-    while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
-        # Slight weirdness here because we need value function at time T
-        # before returning segment [0, T-1] so we get the correct
-        # terminal value
-        if (t > 0 and t % horizon == 0) or ep_num >= eval_iters:
-            yield {"ob": obs, "rew": rews, "vpred": vpreds, "new": news,
-                   "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
-                   "ep_rets": ep_rets, "ep_lens": ep_lens}
-            # Be careful!!! if you change the downstream algorithm to aggregate
-            # several of these batches, then be sure to do a deepcopy
-            ep_rets = []
-            ep_lens = []
-            if ep_num >= eval_iters:
-                ep_num = 0
-                t = 0
-        i = t % horizon
-        obs[i] = ob
-        vpreds[i] = vpred
-        news[i] = new
-        acs[i] = ac
-        prevacs[i] = prevac
-
-        ob, rew, new, _ = env.step(ac)
-        rews[i] = rew
-
-        cur_ep_ret += rew
-        cur_ep_len += 1
-        timesteps_so_far += 1
-        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(best_fitness)
-        if new:
-            ep_num += 1
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
-        t += 1
-
-
-def fitness_evaluation(atarg):
-    a_estimate = np.mean(atarg)
-    return a_estimate
-
-
-def result_record(best_fitness_so_far):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart
     logger.log("********** Iteration %i ************" % iters_so_far)
-    # rewbuffer.append(best_fitness_so_far)
     print(rewbuffer)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
@@ -284,21 +164,21 @@ def learn(env, policy_fn, *,
     ac_space = env.action_space
     pi = policy_fn("pi", ob_space, ac_space)  # Construct network for new policy
     oldpi = policy_fn("oldpi", ob_space, ac_space)  # Network for old policy
-    evalpi = policy_fn("evalpi", ob_space, ac_space)  # Network for old policy
-    # used for CMAES evaluation
+    evalpi = policy_fn("evalpi", ob_space, ac_space)  # Network for cmaes individual to train
+
     atarg = tf.placeholder(dtype = tf.float32, shape = [
         None])  # Target advantage function (if applicable)
     ret = tf.placeholder(dtype = tf.float32, shape = [None])  # Empirical return
 
-    reward = tf.placeholder(dtype = tf.float32, shape = [None]) #step rewards
+    reward = tf.placeholder(dtype = tf.float32, shape = [None])  # step rewards
     lrmult = tf.placeholder(name = 'lrmult', dtype = tf.float32,
                             shape = [])  # learning rate multiplier, updated with schedule
+
     clip_param = clip_param * lrmult  # Annealed cliping parameter epislon
 
     ob = U.get_placeholder_cached(name = "ob")
-    next_ob = U.get_placeholder_cached(name = "next_ob")
-    ac = U.get_placeholder_cached(name = "act")
-    # ac = pi.pdtype.sample_placeholder([None])
+    next_ob = U.get_placeholder_cached(name = "next_ob")  # next step observation for updating q function
+    ac = U.get_placeholder_cached(name = "act")  # action placeholder for computing q function
 
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
@@ -316,11 +196,11 @@ def learn(env, policy_fn, *,
     y = reward + gamma * tf.squeeze(pi.vpred)
     qf_loss = tf.reduce_mean(tf.square(y - pi.qpred))
     vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
-    total_loss = pol_surr + pol_entpen + vf_loss
+    total_loss = pol_surr + pol_entpen  # v function is independently trained
     qf_losses = [qf_loss]
     vf_losses = [vf_loss]
-    losses = [pol_surr, pol_entpen, vf_loss, meankl, meanent]
-    loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
+    losses = [pol_surr, pol_entpen, meankl, meanent]
+    loss_names = ["pol_surr", "pol_entpen", "kl", "ent"]
 
     var_list = pi.get_trainable_variables()
     # print(var_list)
@@ -331,11 +211,10 @@ def learn(env, policy_fn, *,
             "logits")]
         pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
             "value")]
-        # Policy + Value function, the final layer
-        var_list = lin_var_list + vf_var_list + pol_var_list
-        print(var_list)
+        # Policy + Value function, the final layer, all trainable variables
+        # Remove vf variables
+        var_list = lin_var_list + pol_var_list
     else:
-
         fc2_var_list = [v for v in var_list if v.name.split("/")[2].startswith(
             "fc2")]
         final_var_list = [v for v in var_list if v.name.split("/")[
@@ -355,32 +234,38 @@ def learn(env, policy_fn, *,
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
     lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                              losses + [U.flatgrad(total_loss, var_list)])
-    adam = MpiAdam(var_list, epsilon = adam_epsilon)
+
+    qf_adam = MpiAdam(qf_var_list, epsilon = adam_epsilon)
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
 
-    qf_adam = MpiAdam(qf_var_list, epsilon = adam_epsilon)
+    adam = MpiAdam(var_list, epsilon = adam_epsilon)
 
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
             oldpi.get_variables(), pi.get_variables())])
 
+    # Assign pi to evalpi
     assign_eval_eq_new = U.function([], [], updates = [tf.assign(evalv, newv)
-                                                      for (evalv, newv) in zipsame(
+                                                       for (evalv, newv) in zipsame(
             evalpi.get_variables(), pi.get_variables())])
 
-    assign_new_eq_eval= U.function([], [], updates = [tf.assign(newv,evalv)
-                                                      for (newv,evalv) in zipsame(
+    # Assign evalpi back to pi
+    assign_new_eq_eval = U.function([], [], updates = [tf.assign(newv, evalv)
+                                                       for (newv, evalv) in zipsame(
             pi.get_variables(), evalpi.get_variables())])
 
+    # Compute all losses
     compute_losses = U.function([ob, ac, atarg, ret, lrmult], losses)
 
-    get_prob = U.function([ob, ac], [tf.exp(pi.pd.logp(ac))])
-
+    # compute the Advantage estimations: A = Q - V for pi
     get_A_estimation = U.function([ob, next_ob, ac], [pi.qpred - pi.vpred])
+    # compute the Advantage estimations: A = Q - V for evalpi
     get_eval_A_estimation = U.function([ob, next_ob, ac], [evalpi.qpred - evalpi.vpred])
 
+    # compute the mean action for given states under pi
     mean_actions = U.function([ob], [pi.pd.mode()])
+    # compute the mean action for given states under evalpi
     mean_eval_actions = U.function([ob], [evalpi.pd.mode()])
 
     U.initialize()
@@ -399,15 +284,9 @@ def learn(env, policy_fn, *,
     # Prepare for rollouts
     # ----------------------------------------
     # assign pi to eval_pi
-    # Build generator for all solutions
     actors = []
     best_fitness = 0
-    for i in range(popsize):
-        newActor = traj_segment_generator_cmaes(pi, env,
-                                                timesteps_per_actorbatch,
-                                                stochastic = True,
-                                                eval_iters = eval_iters)
-        actors.append(newActor)
+
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
@@ -434,15 +313,10 @@ def learn(env, policy_fn, *,
 
         logger.log("********** Iteration %i ************" % iters_so_far)
 
-        # Use atarg the advantage function estimation to do evaluation
-
-        # Use CMAES layer-wised train
-        # best_fitness = (np.mean(rews) + best_fitness)/2
         # CMAES
-
         assign_eval_eq_new()
-        weights = evalpi.get_trainable_variables()
-        pi_weights = pi.get_trainable_variables()
+        weights = np.copy(evalpi.get_trainable_variables())
+        pi_weights = np.copy(pi.get_trainable_variables())
         if i >= len(weights):
             i = 0
         while i < len(weights):
@@ -460,7 +334,8 @@ def learn(env, policy_fn, *,
                 pi_layer_params = [pi_weights[i]]
                 if len(layer_params) <= 1:
                     layer_params = [weights[i - 1], weights[i]]
-            layer_params_flat = evalpi.get_Layer_Flat_variables(layer_params)()
+                    pi_layer_params = [pi_weights[i - 1], pi_weights[i]]
+            layer_params_flat = np.copy(evalpi.get_Layer_Flat_variables(layer_params)())
             index, init_uniform_layer_weights = uniform_select(layer_params_flat,
                                                                500)
             opt = cma.CMAOptions()
@@ -485,16 +360,15 @@ def learn(env, policy_fn, *,
                 if es.countiter >= opt['maxiter']:
                     break
 
-                #Every generation re-esitmate advantage functions
+                # Every generation re-esitmate advantage functions
                 seg = seg_gen.__next__()
                 add_vtarg_and_adv(seg, gamma, lam)
 
                 # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
-                ob, next_ob, ac, atarg, tdlamret, reward = seg["ob"], seg["next_ob"],  seg["ac"], seg["adv"], seg[
+                ob, next_ob, ac, atarg, tdlamret, reward = seg["ob"], seg["next_ob"], seg["ac"], seg["adv"], seg[
                     "tdlamret"], seg["rew"]
                 vpredbefore = seg["vpred"]  # predicted value function before udpate
-                atarg = (
-                                atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
+                atarg = (atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
                 d = Dataset(dict(ob = ob, ac = ac, atarg = atarg, vtarg = tdlamret),
                             shuffle = not pi.recurrent)
                 optim_batchsize = optim_batchsize or ob.shape[0]
@@ -505,7 +379,7 @@ def learn(env, policy_fn, *,
                 lenbuffer.extend(lens)
                 rewbuffer.extend(rews)
 
-                #Re-train V function
+                # Re-train V function
                 for _ in range(optim_epochs):
                     losses = []  # list of tuples, each of which gives the loss for a minibatch
                     for batch in d.iterate_once(optim_batchsize):
@@ -513,23 +387,21 @@ def learn(env, policy_fn, *,
                                                        batch["atarg"], batch["vtarg"],
                                                        cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)
-                    # logger.log(fmt_row(13, np.mean(vf_losses, axis=0)))
 
                 # Random select tansitions to train Q
                 random_idx = []
                 len_repo = len(seg["ob"])
-                optim_epochs_q = int(len_repo/optim_batchsize)
+                optim_epochs_q = int(len_repo / optim_batchsize)
                 for _ in range(optim_epochs_q):
                     random_idx.append(np.random.choice(range(len_repo), optim_batchsize))
 
-                #Re-train q function
+                # Re-train q function
                 for _ in range(optim_epochs_q):
                     losses = []  # list of tuples, each of which gives the loss for a minibatch
                     for idx in random_idx:
                         *qf_losses, g = qf_lossandgrad(seg["next_ob"][idx], seg["ac"][idx], seg["ob"][idx],
                                                        cur_lrmult, seg["rew"][idx])
                         qf_adam.update(g, optim_stepsize * cur_lrmult)
-                    # logger.log(fmt_row(13, np.mean(vf_losses, axis=0)))
 
                 assign_eval_eq_new()
                 solutions = es.ask()
@@ -538,22 +410,25 @@ def learn(env, policy_fn, *,
                 costs = []
                 lens = []
                 # Evaluation
-                original_layer_weights = np.take(layer_params_flat, index)
+                original_layer_weights = np.copy(np.take(layer_params_flat, index))
 
+                a_func =get_A_estimation(ob,ob,np.array(mean_actions(ob)).transpose().reshape(
+                                                              (len(ob), 1)))
+                a_func = (a_func - np.mean(a_func)) / np.std(a_func)
+                print("A-pi0:",
+                      np.mean(a_func))
+                print()
                 for id, solution in enumerate(solutions):
-                    print("A-pi0:",
-                          fitness_evaluation(get_A_estimation(ob,
-                                                              ob,
-                                                              np.array(mean_actions(ob)).transpose().reshape((len(ob), 1)))
-                                             ))
                     new_variable = set_uniform_weights(layer_params_flat, solution, index)
                     evalpi.set_Layer_Flat_variables(layer_params, new_variable)
                     # indv_seg = actors[id].__next__()
                     # costs.append(-np.mean(indv_seg["ep_rets"]))
-                    new_a_estimation = fitness_evaluation(
-                        get_eval_A_estimation(ob, ob, np.array(mean_eval_actions(ob)).transpose().reshape((len(ob), 1))))
-                    print("pi",id, ":", new_a_estimation)
-                    costs.append(-new_a_estimation)
+                    new_a_func= get_eval_A_estimation(ob,
+                                              ob,
+                                              np.array(mean_eval_actions(ob)).transpose().reshape((len(ob), 1)))
+                    new_a_func = (new_a_func - np.mean(new_a_func)) / np.std(new_a_func)
+                    print("A-pi" + str(id + 1), ":", np.mean(new_a_func))
+                    costs.append(-np.mean(new_a_func))
 
                     evalpi.set_Layer_Flat_variables(layer_params, original_layer_weights)
                     # lens.append(np.sum(indv_seg["ep_lens"]))
@@ -582,14 +457,14 @@ def learn(env, policy_fn, *,
                 evalpi.set_Layer_Flat_variables(layer_params, best_layer_params_flat)
                 print("Generation:", es.countiter)
                 print("Best Solution Fitness:", best_fitness)
-
                 assign_new_eq_eval()
-                assign_old_eq_new()  # set old parameter values to new parameter values
+                # set old parameter values to new parameter values
                 # if hasattr(pi, "ob_rms"): pi.ob_rms.update(
                 #     ob_segs['ob'])  # update running mean/std for policy
             i += 2
             # break
-        #Reestimate Advantage function based on the newly updated Pi
+        assign_old_eq_new()
+        # Reestimate Advantage function based on the newly updated Pi
         # seg = seg_gen.__next__()
         # add_vtarg_and_adv(seg, gamma, lam)
         #
@@ -615,7 +490,7 @@ def learn(env, policy_fn, *,
         #                                        batch["atarg"], batch["vtarg"],
         #                                        cur_lrmult)
         #         vf_adam.update(g, optim_stepsize * cur_lrmult)
-            # logger.log(fmt_row(13, np.mean(vf_losses, axis=0)))
+        # logger.log(fmt_row(13, np.mean(vf_losses, axis=0)))
 
         # Here we do a bunch of optimization epochs over the data
         # for _ in range(optim_epochs):
@@ -645,6 +520,7 @@ def fitness_normalization(x):
     std = np.std(x)
     return (x - mean) / std, x
 
+
 def fitness_rank(x):
     x = np.asarray(x).flatten()
     ranks = np.empty(len(x))
@@ -652,6 +528,7 @@ def fitness_rank(x):
     ranks /= (len(x) - 1)
     ranks -= .5
     return ranks, x
+
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
