@@ -10,8 +10,7 @@ import cma
 from baselines import logger
 from baselines.common import Dataset, explained_variance, fmt_row, zipsame
 from baselines.common.mpi_adam import MpiAdam
-from baselines.common.mpi_moments import mpi_moments
-from baselines.ppo_cmaes_per_layer.cnn_policy import CnnPolicy
+from baselines.ppo_cmaes.cnn_policy import CnnPolicy
 
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 

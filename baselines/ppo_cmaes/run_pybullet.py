@@ -24,7 +24,7 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.01
     eval_iters = 1
-    from baselines.ppo_cmaes_per_layer_new import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
@@ -52,8 +52,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(filename="PPO1-" + args.env,
-                     format_strs=['stdout', 'log', 'csv'])
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PPO-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
