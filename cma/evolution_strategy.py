@@ -72,7 +72,7 @@ in particular `CMAOptions`, `CMAEvolutionStrategy`, and `fmin`
 # 16/10/02: copy_always parameter is gone everywhere, use
 #           np.array(., copy=True)
 # 16/xx/xx: revised doctests with doctest: +ELLIPSIS option, test call(s)
-#           moved all test related to test.py, is quite clean now
+#           moved all test related to testPybullet.py, is quite clean now
 #           "python -m cma.test" is how it works now
 # 16/xx/xx: cleaning up, all kind of larger changes.
 # 16/xx/xx: single file cma.py broken into pieces such that cma has now

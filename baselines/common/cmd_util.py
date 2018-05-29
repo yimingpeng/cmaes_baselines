@@ -1,7 +1,13 @@
 """
 Helpers for scripts like run_atari.py.
 """
+import os, inspect
 
+from pybullet_envs.gym_pendulum_envs import InvertedDoublePendulumBulletEnv
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(os.path.dirname(currentdir))
+os.sys.path.insert(0,parentdir)
 import os
 import gym
 from gym.wrappers import FlattenDictWrapper
@@ -60,6 +66,18 @@ def make_simple_control_env(env_id, seed):
     env.seed(seed)
     return env
 
+def make_pybullet_env(env_id, seed):
+    """
+    Added by Yiming (29/5/2018)
+    Create a wrapped, monitored gym.Env for MuJoCo.
+    """
+    set_global_seeds(seed)
+    env = gym.make(env_id)
+    # env = Monitor(env, logger.get_dir(),allow_early_resets=True)
+    # env = InvertedDoublePendulumBulletEnv()
+    env.seed(seed)
+    return env
+
 def arg_parser():
     """
     Create an empty argparse.ArgumentParser.
@@ -108,4 +126,19 @@ def simple_ctrl_arg_parser():
                         default="CartPole-v0")
     parser.add_argument('--seed', help='RNG seed', type=int, default=1)
     parser.add_argument('--num-timesteps', type=int, default=int(1e6))
+    return parser
+
+
+def pybullet_arg_parser():
+    """
+    Added by Yiming (29/5/2018)
+    Create an argparse.ArgumentParser for run_pybullet.py.
+    """
+    parser = arg_parser()
+    # parser.add_argument('--env', help='environment ID', type=str,
+    #                     default="InvertedDoublePendulumBulletEnv-v0")
+    parser.add_argument('--env', help='environment ID', type=str,
+                        default="InvertedPendulumBulletEnv-v0")
+    parser.add_argument('--seed', help='RNG seed', type=int, default=1)
+    parser.add_argument('--num-timesteps', type=int, default=int(2e6))
     return parser

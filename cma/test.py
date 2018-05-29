@@ -10,8 +10,8 @@ Usage::
 
 or possibly by executing this file as a script::
 
-    python cma/test.py  # same options as above work
-    cma/test.py         # the same
+    python cma/testPybullet.py  # same options as above work
+    cma/testPybullet.py         # the same
 
 or equivalently by passing Python code::
 
@@ -47,7 +47,7 @@ files_for_doctest = ['bbobbenchmarks.py',
                      'recombination_weights.py',
                      'sampler.py',
                      'sigma_adaptation.py',
-                     'test.py',
+                     'testPybullet.py',
                      'transformations.py',
                      os.path.join('utilities', 'math.py'),
                      os.path.join('utilities', 'utils.py'),
