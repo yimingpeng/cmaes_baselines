@@ -49,8 +49,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(filename="PPO1-" + args.env,
-                     format_strs=['stdout', 'log', 'csv'])
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

@@ -6,6 +6,8 @@ import cma
 import numpy as np
 from baselines import logger
 from mpi4py import MPI
+import tensorflow as tf
+from baselines.common import zipsame
 
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
@@ -163,6 +165,7 @@ def learn(base_env,
     ob_space = base_env.observation_space
     ac_space = base_env.action_space
     pi = policy_fn("pi", ob_space, ac_space)  # Construct network for new policy
+    backup_pi = policy_fn("backup_pi", ob_space, ac_space)  # Construct a network for every individual to adapt during the es evolution
 
     U.initialize()
     global timesteps_so_far, episodes_so_far, iters_so_far, \
@@ -173,6 +176,14 @@ def learn(base_env,
     tstart = time.time()
     lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
     rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
+
+
+    assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
+                                                      for (backup_v, newv) in zipsame(
+            backup_pi.get_trainable_variables(), pi.get_trainable_variables())])
+    assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
+                                                      for (newv, backup_v) in zipsame(
+            pi.get_trainable_variables(), backup_pi.get_trainable_variables())])
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -188,6 +199,7 @@ def learn(base_env,
         actors.append(newActor)
 
     seg_gen = traj_segment_generator_eval(pi, base_env, timesteps_per_actorbatch, stochastic=True)
+    assign_backup_eq_new() # backup current policy
     flatten_weights = pi.get_Flat_variables()()
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
@@ -243,6 +255,7 @@ def learn(base_env,
                 ob_segs = {'ob': np.copy(seg['ob'])}
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
+            assign_new_eq_backup()
         # Weights decay
         l2_decay = compute_weight_decay(0.999, solutions)
         costs += l2_decay
@@ -258,7 +271,6 @@ def learn(base_env,
         ob = ob_segs["ob"]
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for policy
 
-        seg = seg_gen.__next__()
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
