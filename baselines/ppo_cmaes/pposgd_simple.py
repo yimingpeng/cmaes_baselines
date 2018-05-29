@@ -297,7 +297,8 @@ def learn(env, policy_fn, *,
 
     ob = U.get_placeholder_cached(name = "ob")
     next_ob = U.get_placeholder_cached(name = "next_ob")
-    ac = pi.pdtype.sample_placeholder([None])
+    ac = U.get_placeholder_cached(name = "act")
+    # ac = pi.pdtype.sample_placeholder([None])
 
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
@@ -537,30 +538,20 @@ def learn(env, policy_fn, *,
                 costs = []
                 lens = []
                 # Evaluation
-                # for id, solution in enumerate(solutions):
-                #     new_variable = set_uniform_weights(layer_params_flat, solution, index)
-                #     pi.set_Layer_Flat_variables(layer_params, new_variable)
-                #     indv_seg = actors[id].__next__()
-                #     costs.append(-np.mean(indv_seg["ep_rets"]))
-                #     lens.append(np.sum(indv_seg["ep_lens"]))
-                #     segs.append(indv_seg)
-                #     if ob_segs is None:
-                #         ob_segs = {'ob': np.copy(indv_seg['ob'])}
-                #     else:
-                #         ob_segs['ob'] = np.append(ob_segs['ob'], indv_seg['ob'], axis=0)
-                layer_params_flat = evalpi.get_Layer_Flat_variables(layer_params)()
                 original_layer_weights = np.take(layer_params_flat, index)
 
                 for id, solution in enumerate(solutions):
-
                     print("A-pi0:",
-                          fitness_evaluation(get_A_estimation(ob, ob, np.array(mean_actions(ob)).transpose().reshape((len(ob), )))))
+                          fitness_evaluation(get_A_estimation(ob,
+                                                              ob,
+                                                              np.array(mean_actions(ob)).transpose().reshape((len(ob), 1)))
+                                             ))
                     new_variable = set_uniform_weights(layer_params_flat, solution, index)
                     evalpi.set_Layer_Flat_variables(layer_params, new_variable)
                     # indv_seg = actors[id].__next__()
                     # costs.append(-np.mean(indv_seg["ep_rets"]))
                     new_a_estimation = fitness_evaluation(
-                        get_eval_A_estimation(ob, ob, np.array(mean_eval_actions(ob)).transpose().reshape((len(ob), ))))
+                        get_eval_A_estimation(ob, ob, np.array(mean_eval_actions(ob)).transpose().reshape((len(ob), 1))))
                     print("pi",id, ":", new_a_estimation)
                     costs.append(-new_a_estimation)
 

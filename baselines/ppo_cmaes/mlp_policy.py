@@ -26,6 +26,10 @@ class MlpPolicy(object):
         next_ob = U.get_placeholder(name="next_ob", dtype=tf.float32,
                                shape=[sequence_length] + list(ob_space.shape))
 
+        act = U.get_placeholder(name="act", dtype=tf.float32,
+                               shape=[sequence_length] + list(ac_space.shape))
+
+
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
 
@@ -33,7 +37,8 @@ class MlpPolicy(object):
         with tf.variable_scope('qf'):
             obz = tf.clip_by_value((next_ob - self.ob_rms.mean) / self.ob_rms.std,
                                    -5.0, 5.0)
-            last_out = obz
+            # last_out = obz
+            last_out = tf.concat([obz, act], axis=-1)
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(
                     tf.layers.dense(last_out, hid_size, name="fc%i" % (i + 1),
