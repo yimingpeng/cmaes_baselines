@@ -113,18 +113,3 @@ class MlpPolicy(object):
 
     def get_initial_state(self):
         return []
-
-    def get_Flat_variables(self, get_flat):
-        # weights = [v for v in self.get_trainable_variables()]
-        return get_flat(self.get_trainable_variables())
-
-    def set_Flat_variables(self, set_from_flat, var_list):
-        # set_from_flat = U.SetFromFlat(self.get_trainable_variables())
-        set_from_flat(var_list)
-
-    def get_Layer_Flat_variables(self, var_list):
-        return U.GetFlat(var_list)
-
-    def set_Layer_Flat_variables(self, set_from_flat, old_var_list, var_list):
-        # set_from_flat = U.SetFromFlat(old_var_list)
-        set_from_flat(var_list)

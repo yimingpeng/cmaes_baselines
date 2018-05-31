@@ -334,6 +334,9 @@ def learn(env, policy_fn, *,
     mean_Kl = U.function([ob], [tf.reduce_mean(klpi_pi_zero)])
 
     U.initialize()
+    pi_set_flat = U.SetFromFlat(pi.get_trainable_variables())
+    pi_get_flat = U.GetFlat(pi.get_trainable_variables())
+
     adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
@@ -449,7 +452,7 @@ def learn(env, policy_fn, *,
         #     layer_params = [weights[i]]
         #     if len(layer_params) <= 1:
         #         layer_params = [weights[i - 1], weights[i]]
-        layer_params_flat = pi.get_Layer_Flat_variables(layer_params)()
+        layer_params_flat = get_layer_flat(layer_params)
         index, init_uniform_layer_weights = uniform_select(layer_params_flat,
                                                            1000)
         opt = cma.CMAOptions()
@@ -490,7 +493,7 @@ def learn(env, policy_fn, *,
             print()
             for id, solution in enumerate(solutions):
                 new_variable = set_uniform_weights(layer_params_flat, solution, index)
-                pi.set_Layer_Flat_variables(layer_params, new_variable)
+                set_layer_flat(layer_params, new_variable)
                 new_a_func= get_A_estimation(ob,
                                           ob,
                                           np.array(mean_actions(ob)).transpose().reshape((len(ob), 1)))
@@ -520,7 +523,7 @@ def learn(env, policy_fn, *,
             best_layer_params_flat = set_uniform_weights(layer_params_flat,
                                                          best_solution,
                                                          index)
-            pi.set_Layer_Flat_variables(layer_params, best_layer_params_flat)
+            set_layer_flat(layer_params, best_layer_params_flat)
             if mean_Kl(ob)[0] > 0.05: # Check the kl diverge
                 print("mean_kl:", mean_Kl(ob)[0])
                 print("Cancel updating")
@@ -564,3 +567,23 @@ def fitness_rank(x):
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
+
+def get_layer_flat(var_list):
+    op = tf.concat(axis=0, values=[tf.reshape(v, [U.numel(v)]) for v in var_list])
+    return tf.get_default_session().run(op)
+
+def set_layer_flat(old_var_list, var_list):
+    assigns = []
+    dtype = tf.float32
+    shapes = list(map(U.var_shape, old_var_list))
+    total_size = np.sum([U.intprod(shape) for shape in shapes])
+
+    theta = theta = tf.placeholder(dtype, [total_size])
+    start = 0
+    assigns = []
+    for (shape, v) in zip(shapes, old_var_list):
+        size = U.intprod(shape)
+        assigns.append(tf.assign(v, tf.reshape(theta[start:start + size], shape)))
+        start += size
+    op = tf.group(*assigns)
+    return tf.get_default_session().run(op, feed_dict={theta: var_list})
