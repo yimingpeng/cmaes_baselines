@@ -168,6 +168,9 @@ def learn(base_env,
     backup_pi = policy_fn("backup_pi", ob_space, ac_space)  # Construct a network for every individual to adapt during the es evolution
 
     U.initialize()
+    pi_set_flat = U.SetFromFlat(pi.get_trainable_variables())
+    pi_get_flat = U.GetFlat(pi.get_trainable_variables())
+
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer,best_fitness
     episodes_so_far = 0
@@ -200,7 +203,7 @@ def learn(base_env,
 
     seg_gen = traj_segment_generator_eval(pi, base_env, timesteps_per_actorbatch, stochastic=True)
     assign_backup_eq_new() # backup current policy
-    flatten_weights = pi.get_Flat_variables()()
+    flatten_weights = pi_get_flat()
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
     opt['popsize'] = popsize
@@ -246,7 +249,8 @@ def learn(base_env,
         costs = []
         lens = []
         for id, solution in enumerate(solutions):
-            pi.set_Flat_variables(solution)
+            # pi.set_Flat_variables(solution)
+            pi_set_flat(solution)
             seg = actors[id].__next__()
             costs.append(-np.mean(seg["ep_rets"]))
             lens.append(np.sum(seg["ep_lens"]))
@@ -265,7 +269,7 @@ def learn(base_env,
         best_fitness = -es.result[1]
         print("Generation:", es.countiter)
         print("Best Solution Fitness:", best_fitness)
-        pi.set_Flat_variables(best_solution)
+        pi_set_flat(best_solution)
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob = ob_segs["ob"]
