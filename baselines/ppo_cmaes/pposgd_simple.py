@@ -234,6 +234,7 @@ def learn(env, policy_fn, *,
     ob = U.get_placeholder_cached(name = "ob")
     next_ob = U.get_placeholder_cached(name = "next_ob")  # next step observation for updating q function
     ac = U.get_placeholder_cached(name = "act")  # action placeholder for computing q function
+    mean_ac = U.get_placeholder_cached(name = "mean_act")  # action placeholder for computing q function
 
     kloldnew = oldpi.pd.kl(pi.pd)
     klpi_pi_zero = pi.pd.kl(pi_zero.pd)
@@ -249,7 +250,7 @@ def learn(env, policy_fn, *,
     pol_surr = - tf.reduce_mean(
         tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
 
-    y = reward + gamma * tf.squeeze(pi.vpred)
+    y = reward + gamma * pi.mean_qpred
     qf_loss = tf.reduce_mean(tf.square(y - pi.qpred))
     vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
     total_loss = pol_surr + pol_entpen  # v function is independently trained
@@ -283,9 +284,23 @@ def learn(env, policy_fn, *,
     # print(var_list)
     qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "qf")]
+    mean_qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
+        "meanqf")]
     vf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "vf")]
-    qf_lossandgrad = U.function([ob, ac, next_ob, lrmult, reward],
+
+    # compute the Advantage estimations: A = Q - V for pi
+    get_A_estimation = U.function([ob, next_ob, ac], [pi.qpred - pi.vpred])
+    get_A_pi_zero_estimation = U.function([ob, next_ob, ac], [pi_zero.qpred - pi_zero.vpred])
+    # compute the Advantage estimations: A = Q - V for evalpi
+
+    # compute the mean action for given states under pi
+    mean_pi_actions = U.function([ob], [pi.pd.mode()])
+    mean_pi_zero_actions = U.function([ob], [pi_zero.pd.mode()])
+    # compute the mean kl
+    mean_Kl = U.function([ob], [tf.reduce_mean(klpi_pi_zero)])
+
+    qf_lossandgrad = U.function([ob, ac, next_ob, mean_ac, lrmult, reward],
                                 qf_losses + [U.flatgrad(qf_loss, qf_var_list)])
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
@@ -298,6 +313,9 @@ def learn(env, policy_fn, *,
 
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
 
+    assign_target_q_eq_eval_q = U.function([], [], updates = [tf.assign(oldqv, newqv)
+                                                      for (oldqv, newqv) in zipsame(
+            mean_qf_var_list, qf_var_list)])
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
             oldpi.get_variables(), pi.get_variables())])
@@ -324,17 +342,6 @@ def learn(env, policy_fn, *,
     compute_v_losses = U.function([ob, ac, atarg, ret, lrmult], vf_losses)
     compute_v_losses = U.function([ob, ac, next_ob, lrmult, reward], qf_losses)
     compute_losses = U.function([ob, ac, atarg, ret, lrmult], losses)
-
-    # compute the Advantage estimations: A = Q - V for pi
-    get_A_estimation = U.function([ob, next_ob, ac], [pi.qpred - pi.vpred])
-    get_A_pi_zero_estimation = U.function([ob, next_ob, ac], [pi_zero.qpred - pi_zero.vpred])
-    # compute the Advantage estimations: A = Q - V for evalpi
-
-    # compute the mean action for given states under pi
-    mean_pi_actions = U.function([ob], [pi.pd.mode()])
-    mean_pi_zero_actions = U.function([ob], [pi_zero.pd.mode()])
-    # compute the mean kl
-    mean_Kl = U.function([ob], [tf.reduce_mean(klpi_pi_zero)])
 
     U.initialize()
     pi_set_flat = U.SetFromFlat(pi.get_trainable_variables())
@@ -438,13 +445,16 @@ def learn(env, policy_fn, *,
         for _ in range(optim_epochs_q):
             losses = []  # list of tuples, each of which gives the loss for a minibatch
             for idx in random_idx:
-                *qf_losses, g = qf_lossandgrad(seg["next_ob"][idx], seg["ac"][idx], seg["ob"][idx],
+                *qf_losses, g = qf_lossandgrad(seg["ob"][idx], seg["ac"][idx], seg["next_ob"][idx], mean_pi_actions(ob)[0][idx],
                                                cur_lrmult, seg["rew"][idx])
                 qf_adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(qf_losses)
             logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         logger.log("CMAES Policy Optimization")
+        # Make two q network equal
+        assign_target_q_eq_eval_q()
+
         # CMAES
         assign_pi_zero_eq_new() #memorize the p0
 
@@ -526,11 +536,9 @@ def learn(env, policy_fn, *,
             lens = []
             # Evaluation
 
-            a_func =get_A_estimation(ob,ob,np.array(mean_pi_actions(ob)).transpose().reshape(
-                                                          (len(ob), 1)))
+            a_func =get_A_estimation(ob,ob,mean_pi_actions(ob)[0])
             # a_func = (a_func - np.mean(a_func)) / np.std(a_func)
-            a_func_pi_zero = get_A_pi_zero_estimation(ob,ob,np.array(mean_pi_zero_actions(ob)).transpose().reshape(
-                                                          (len(ob), 1)))
+            a_func_pi_zero = get_A_pi_zero_estimation(ob,ob,mean_pi_zero_actions(ob)[0])
             print("A-pi-zero:", np.mean(a_func_pi_zero))
             print("A-pi-best:",
                   np.mean(a_func))
