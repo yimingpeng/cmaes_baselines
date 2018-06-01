@@ -13,7 +13,8 @@ from baselines.common.mpi_adam import MpiAdam
 from baselines.ppo_cmaes.cnn_policy import CnnPolicy
 
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
-
+KL_Condition = False
+mean_action_Condition = True
 
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
@@ -166,7 +167,7 @@ def uniform_select(weight, num_of_weights):
 
 
 def set_uniform_weights(original_weight, new_weight, index):
-    result_weight = np.copy(original_weight)
+    result_weight = original_weight
     np.put(result_weight, index, new_weight)
     return result_weight
 
@@ -304,18 +305,18 @@ def learn(env, policy_fn, *,
     # Assign pi to backup (only backup trainable variables)
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                        for (backup_v, newv) in zipsame(
-            backup_pi.get_trainable_variables(), pi.get_trainable_variables())])
+            backup_pi.get_variables(), pi.get_variables())])
 
     # Assign backup back to pi
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
                                                        for (newv, backup_v) in zipsame(
-            pi.get_trainable_variables(), backup_pi.get_trainable_variables())])
+            pi.get_variables(), backup_pi.get_variables())])
 
 
     # Assign pi to pi0 (for parameter updating constraints)
     assign_pi_zero_eq_new = U.function([], [], updates = [tf.assign(pi_zero_v, newv)
                                                        for (pi_zero_v, newv) in zipsame(
-            pi_zero.get_trainable_variables(), pi.get_trainable_variables())])
+            pi_zero.get_variables(), pi.get_variables())])
 
 
     # Compute all losses
@@ -326,16 +327,20 @@ def learn(env, policy_fn, *,
 
     # compute the Advantage estimations: A = Q - V for pi
     get_A_estimation = U.function([ob, next_ob, ac], [pi.qpred - pi.vpred])
+    get_A_pi_zero_estimation = U.function([ob, next_ob, ac], [pi_zero.qpred - pi_zero.vpred])
     # compute the Advantage estimations: A = Q - V for evalpi
 
     # compute the mean action for given states under pi
-    mean_actions = U.function([ob], [pi.pd.mode()])
+    mean_pi_actions = U.function([ob], [pi.pd.mode()])
+    mean_pi_zero_actions = U.function([ob], [pi_zero.pd.mode()])
     # compute the mean kl
     mean_Kl = U.function([ob], [tf.reduce_mean(klpi_pi_zero)])
 
     U.initialize()
     pi_set_flat = U.SetFromFlat(pi.get_trainable_variables())
     pi_get_flat = U.GetFlat(pi.get_trainable_variables())
+    backup_pi_get_flat = U.GetFlat(backup_pi.get_trainable_variables())
+    pi_zero_get_flat = U.GetFlat(pi_zero.get_trainable_variables())
 
     adam.sync()
 
@@ -424,7 +429,7 @@ def learn(env, policy_fn, *,
         # Random select tansitions to train Q
         random_idx = []
         len_repo = len(seg["ob"])
-        optim_epochs_q = int(len_repo / optim_batchsize)
+        optim_epochs_q = int(len_repo / optim_batchsize) if int(len_repo / optim_batchsize) > optim_epochs else optim_epochs
         for _ in range(optim_epochs_q):
             random_idx.append(np.random.choice(range(len_repo), optim_batchsize))
 
@@ -470,25 +475,64 @@ def learn(env, policy_fn, *,
         print("Sigma=", sigma1)
         es = cma.CMAEvolutionStrategy(init_uniform_layer_weights,
                                       sigma1, opt)
-        best_solution = np.copy(init_uniform_layer_weights.astype(
-            np.float64))
-        best_fitness = -np.inf
+        best_solution = init_uniform_layer_weights.astype(
+            np.float64)
+        best_fitness = np.inf
         costs = None
         while True:
             if es.countiter >= opt['maxiter']:
                 break
             solutions = es.ask()
+            assign_backup_eq_new() #backup current policy, after Q and V have been trained
+            if KL_Condition:
+                for id, solution in enumerate(solutions):
+                    new_variable = set_uniform_weights(layer_params_flat, solution, index)
+                    set_layer_flat(layer_params, new_variable)
+                    i = 0
+                    mean_kl_const = mean_Kl(ob)[0]
+                    while(mean_kl_const > 0.5):
+                        i+=1
+                        # solutions[id] = es.ask(number = 1, xmean = np.take(pi_zero_get_flat(), index),
+                        # sigma_fac = 0.9 ** i)
+                        solutions[id] = es.ask(number = 1, sigma_fac = 0.9 ** i)[0]
+                        new_variable = set_uniform_weights(layer_params_flat, solutions[id], index)
+                        set_layer_flat(layer_params, new_variable)
+                        mean_kl_const = mean_Kl(ob)[0]
+                        logger.log("Regenerate Solution for " +str(i)+ " times for ID:" + str(id) + " mean_kl:" + str(mean_kl_const))
+
+            if mean_action_Condition:
+                for id, solution in enumerate(solutions):
+                    new_variable = set_uniform_weights(layer_params_flat, solution, index)
+                    set_layer_flat(layer_params, new_variable)
+                    i = 0
+                    # mean_act_dist = np.sqrt(np.dot(np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten(),
+                    #                                np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten()))
+                    abs_act_dist = np.mean(np.abs(np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten()))
+                    while(abs_act_dist > 0.01):
+                        i+=1
+                        # solutions[id] = es.ask(number = 1, xmean = np.take(pi_zero_get_flat(), index),
+                        # sigma_fac = 0.9 ** i)
+                        solutions[id] = es.ask(number = 1, sigma_fac = 0.999 ** i)[0]
+                        new_variable = set_uniform_weights(layer_params_flat, solutions[id], index)
+                        set_layer_flat(layer_params, new_variable)
+                        # mean_act_dist = np.sqrt(np.dot(np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten(),
+                        #                            np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten()))
+                        abs_act_dist = np.mean(np.abs(np.array(mean_pi_actions(ob)).flatten() - np.array(mean_pi_zero_actions(ob)).flatten()))
+                        logger.log("Regenerate Solution for " +str(i)+ " times for ID:" + str(id) + " mean_action_dist:" + str(abs_act_dist))
+            assign_new_eq_backup() # Restore the backup
             segs = []
             ob_segs = None
             costs = []
             lens = []
             # Evaluation
-            assign_backup_eq_new() #backup current policy, after Q and V have been trained
 
-            a_func =get_A_estimation(ob,ob,np.array(mean_actions(ob)).transpose().reshape(
+            a_func =get_A_estimation(ob,ob,np.array(mean_pi_actions(ob)).transpose().reshape(
                                                           (len(ob), 1)))
             # a_func = (a_func - np.mean(a_func)) / np.std(a_func)
-            print("A-pi0:",
+            a_func_pi_zero = get_A_pi_zero_estimation(ob,ob,np.array(mean_pi_zero_actions(ob)).transpose().reshape(
+                                                          (len(ob), 1)))
+            print("A-pi-zero:", np.mean(a_func_pi_zero))
+            print("A-pi-best:",
                   np.mean(a_func))
             print()
             for id, solution in enumerate(solutions):
@@ -496,13 +540,16 @@ def learn(env, policy_fn, *,
                 set_layer_flat(layer_params, new_variable)
                 new_a_func= get_A_estimation(ob,
                                           ob,
-                                          np.array(mean_actions(ob)).transpose().reshape((len(ob), 1)))
+                                          np.array(mean_pi_actions(ob)).transpose().reshape((len(ob), 1)))
                 # new_a_func = (new_a_func - np.mean(new_a_func)) / np.std(new_a_func)
                 print("A-pi" + str(id + 1), ":", np.mean(new_a_func))
-                coeff = 0
-                cost = - (np.mean(new_a_func) - coeff*
-                          np.sqrt(np.dot(pi.get_Flat_variables()() - pi_zero.get_Flat_variables()(),
-                                         pi.get_Flat_variables()() - pi_zero.get_Flat_variables()())))
+                coeff1 = 0.9
+                coeff2 = 0.9
+                cost = - (np.mean(new_a_func))
+                # cost = - (np.mean(new_a_func) - coeff1*
+                #           np.sqrt(np.dot(pi_get_flat() - pi_zero_get_flat(),
+                #                          pi_get_flat() - pi_zero_get_flat()))
+                #           - coeff2 * mean_Kl(ob)[0])
                 # new_a_funcs =
                 costs.append(cost)
                 assign_new_eq_backup() # Restore the backup
@@ -514,30 +561,31 @@ def learn(env, policy_fn, *,
             # es.tell(solutions=solutions, function_values = costs)
             es.tell_real_seg(solutions = solutions, function_values = costs, real_f = costs, segs = None)
             # if -min(costs) >= np.mean(a_func):
-            # if -min(costs) >= best_fitness:
-            print("Update Policy by CMAES")
-            # best_solution = np.copy(es.result[0])
-            # best_fitness = -es.result[1]
-            best_solution = np.copy(solutions[np.argmin(costs)])
-            best_fitness = -min(costs)
-            best_layer_params_flat = set_uniform_weights(layer_params_flat,
-                                                         best_solution,
-                                                         index)
-            set_layer_flat(layer_params, best_layer_params_flat)
-            if mean_Kl(ob)[0] > 0.05: # Check the kl diverge
-                print("mean_kl:", mean_Kl(ob)[0])
-                print("Cancel updating")
-                assign_new_eq_backup()
-            else:
-                assign_pi_zero_eq_new() #memorize the p0
+            if min(costs) <= best_fitness:
+                print("Update Policy by CMAES")
+                # best_solution = np.copy(es.result[0])
+                # best_fitness = -es.result[1]
+                best_solution = solutions[np.argmin(costs)]
+                best_fitness = min(costs)
+                best_layer_params_flat = set_uniform_weights(layer_params_flat,
+                                                             best_solution,
+                                                             index)
+                set_layer_flat(layer_params, best_layer_params_flat)
+            # assign_pi_zero_eq_new()
+            # if mean_Kl(ob)[0] > 0.05: # Check the kl diverge
+            #     print("mean_kl:", mean_Kl(ob)[0])
+            #     print("Cancel updating")
+            #     assign_new_eq_backup()
+            # else:
+            #     assign_pi_zero_eq_new() #memorize the p0
             print("Generation:", es.countiter)
             print("Best Solution Fitness:", best_fitness)
             # set old parameter values to new parameter values
             # break
-
         # Record CMAES-Updated Pi behaviors 25 times
         eval_seg = eval_gen.__next__()
         test_rew_buffer.append(eval_seg["ep_rets"])
+        assign_pi_zero_eq_new() #Update the p0
 
         print("Pi 0 Performance:", test_rew_buffer[0])
         print("Pi 1 Performance:", test_rew_buffer[1])
@@ -549,20 +597,20 @@ def learn(env, policy_fn, *,
         episodes_so_far += sum(lens)
 
 
-def fitness_normalization(x):
-    x = np.asarray(x).flatten()
-    mean = np.mean(x)
-    std = np.std(x)
-    return (x - mean) / std, x
-
-
-def fitness_rank(x):
-    x = np.asarray(x).flatten()
-    ranks = np.empty(len(x))
-    ranks[x.argsort()] = np.arange(len(x))
-    ranks /= (len(x) - 1)
-    ranks -= .5
-    return ranks, x
+# def fitness_normalization(x):
+#     x = np.asarray(x).flatten()
+#     mean = np.mean(x)
+#     std = np.std(x)
+#     return (x - mean) / std, x
+#
+#
+# def fitness_rank(x):
+#     x = np.asarray(x).flatten()
+#     ranks = np.empty(len(x))
+#     ranks[x.argsort()] = np.arange(len(x))
+#     ranks /= (len(x) - 1)
+#     ranks -= .5
+#     return ranks, x
 
 
 def flatten_lists(listoflists):
@@ -573,7 +621,6 @@ def get_layer_flat(var_list):
     return tf.get_default_session().run(op)
 
 def set_layer_flat(old_var_list, var_list):
-    assigns = []
     dtype = tf.float32
     shapes = list(map(U.var_shape, old_var_list))
     total_size = np.sum([U.intprod(shape) for shape in shapes])

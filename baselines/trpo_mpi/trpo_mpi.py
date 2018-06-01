@@ -258,7 +258,6 @@ def learn(env, policy_fn, *,
             logger.record_tabular(lossname, lossval)
 
         with timed("vf"):
-
             for _ in range(vf_iters):
                 for (mbob, mbret) in dataset.iterbatches((seg["ob"], seg["tdlamret"]),
                 include_final_partial_batch=False, batch_size=64):
