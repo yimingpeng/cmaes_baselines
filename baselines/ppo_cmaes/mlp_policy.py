@@ -40,12 +40,11 @@ class MlpPolicy(object):
             last_out = obz
 
             for i in range(num_hid_layers):
-                if i == num_hid_layers - 1:
-                      last_out = tf.concat([last_out, act], axis=-1)
                 last_out = tf.nn.tanh(
                     tf.layers.dense(last_out, hid_size, name="fc%i" % (i + 1),
                                     kernel_initializer=U.normc_initializer(
                                         1.0)))
+            last_out = tf.concat([last_out, act], axis=-1)
             self.qpred = tf.layers.dense(last_out, 1, name='final',
                                          kernel_initializer=U.normc_initializer(
                                              1.0))[:, 0]
