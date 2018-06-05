@@ -202,7 +202,6 @@ def learn(base_env,
         actors.append(newActor)
 
     seg_gen = traj_segment_generator_eval(pi, base_env, timesteps_per_actorbatch, stochastic=True)
-    assign_backup_eq_new() # backup current policy
     flatten_weights = pi_get_flat()
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
@@ -234,6 +233,7 @@ def learn(base_env,
         elif es.countiter >= opt['maxiter']:
             print("Max generations")
             break
+        assign_backup_eq_new() # backup current policy
         eval_seg = seg_gen.__next__()
         lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
