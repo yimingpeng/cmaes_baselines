@@ -37,9 +37,9 @@ class MlpPolicy(object):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
 
         with tf.variable_scope('meanqf'):
-            obz = tf.clip_by_value((next_ob - self.ob_rms.mean) / self.ob_rms.std,
+            next_obz = tf.clip_by_value((next_ob - self.ob_rms.mean) / self.ob_rms.std,
                                    -5.0, 5.0)
-            last_out = obz
+            last_out = next_obz
 
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(
@@ -48,21 +48,6 @@ class MlpPolicy(object):
                                         1.0)))
             last_out = tf.concat([last_out, mean_act], axis=-1)
             self.mean_qpred = tf.layers.dense(last_out, 1, name='final',
-                                         kernel_initializer=U.normc_initializer(
-                                             1.0))[:, 0]
-
-        with tf.variable_scope('qf'):
-            obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std,
-                                   -5.0, 5.0)
-            last_out = obz
-
-            for i in range(num_hid_layers):
-                last_out = tf.nn.tanh(
-                    tf.layers.dense(last_out, hid_size, name="fc%i" % (i + 1),
-                                    kernel_initializer=U.normc_initializer(
-                                        1.0)))
-            last_out = tf.concat([last_out, act], axis=-1)
-            self.qpred = tf.layers.dense(last_out, 1, name='final',
                                          kernel_initializer=U.normc_initializer(
                                              1.0))[:, 0]
 
@@ -79,6 +64,22 @@ class MlpPolicy(object):
                                          kernel_initializer=U.normc_initializer(
                                              1.0))[:, 0]
 
+        with tf.variable_scope('qf'):
+            # obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std,
+            #                        -5.0, 5.0)
+            last_out = obz
+
+            for i in range(num_hid_layers):
+                last_out = tf.nn.tanh(
+                    tf.layers.dense(last_out, hid_size, name="fc%i" % (i + 1),
+                                    kernel_initializer=U.normc_initializer(
+                                        1.0)))
+            last_out = tf.concat([last_out, act], axis=-1)
+            self.qpred = tf.layers.dense(last_out, 1, name='final',
+                                         kernel_initializer=U.normc_initializer(
+                                             1.0))[:, 0]
+
+
         with tf.variable_scope('pol'):
             # out_std = tf.exp(0.5*logstd + 0.0)
             # pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
@@ -89,22 +90,12 @@ class MlpPolicy(object):
                                     kernel_initializer=U.normc_initializer(
                                         1.0)))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-                mean = tf.layers.dense(last_out, pdtype.param_shape()[0] // 2,
-                                       name='final',
-                                       kernel_initializer=U.normc_initializer(
-                                           0.01))
-                logstd = tf.get_variable(name="logstd", shape=[1,
-                                                               pdtype.param_shape()[
-                                                                   0] // 2],
-                                         initializer=tf.zeros_initializer())
-                # pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
-                import numpy as np
-                pdparam = tf.concat([mean, mean * 0.0 + np.random.randn(pdtype.param_shape()[0] // 2) * logstd], axis=1)
+                mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2, name='final', kernel_initializer=U.normc_initializer(0.01))
+                logstd = tf.get_variable(name="logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
+                pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
-                pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0],
-                                          name='final',
-                                          kernel_initializer=U.normc_initializer(
-                                              0.01))
+                pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0], name='final', kernel_initializer=U.normc_initializer(0.01))
+
 
         self.pd = pdtype.pdfromflat(pdparam)
 

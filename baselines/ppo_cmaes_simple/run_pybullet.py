@@ -24,12 +24,12 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.01
     eval_iters = 1
-    from baselines.ppo_cmaes import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_simple import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=16, num_hid_layers=1)
+            hid_size=32, num_hid_layers=2)
 
     env = make_pybullet_env(env_id, seed)
     pposgd_simple.learn(env,policy_fn,
@@ -40,10 +40,10 @@ def train(env_id, num_timesteps, seed):
                         sigma = sigma,
                         eval_iters = eval_iters,
                         max_timesteps=num_timesteps,
-                        timesteps_per_actorbatch=10240,
+                        timesteps_per_actorbatch=12800,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=50, optim_stepsize=3e-4,
-                        optim_batchsize=1024,
+                        optim_epochs=50, optim_stepsize=3e-3,
+                        optim_batchsize=256,
                         gamma=0.99, lam=0.95, schedule='linear',
                         seed=seed,
                         env_id=env_id)
