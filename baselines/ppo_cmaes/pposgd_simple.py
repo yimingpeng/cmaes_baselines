@@ -15,6 +15,65 @@ from baselines.ppo_cmaes.cnn_policy import CnnPolicy
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
 mean_action_Condition = True
+def traj_segment_generator_eval(pi, env, horizon, stochastic):
+    # Trajectories generators
+    global timesteps_so_far
+    t = 0
+    ac = env.action_space.sample()  # not used, just so we have the datatype
+    new = True  # marks if we're on first timestep of an episode
+    ob = env.reset()
+
+    cur_ep_ret = 0  # return in current episode
+    cur_ep_len = 0  # len of current episode
+    ep_rets = []  # returns of completed episodes in this segment
+    ep_lens = []  # lengths of ...
+
+    # Initialize history arrays
+    obs = np.array([ob for _ in range(horizon)])
+    next_obs = np.array([ob for _ in range(horizon)])
+    rews = np.zeros(horizon, 'float32')
+    vpreds = np.zeros(horizon, 'float32')
+    news = np.zeros(horizon, 'int32')
+    acs = np.array([ac for _ in range(horizon)])
+    prevacs = acs.copy()
+
+    while True:
+        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
+            result_record()
+        prevac = ac
+        ac, vpred = pi.act(stochastic, ob)
+        # Slight weirdness here because we need value function at time T
+        # before returning segment [0, T-1] so we get the correct
+        # terminal value
+        if t > 0 and t % horizon == 0:
+            yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "new": news,
+                   "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
+                   "ep_rets": ep_rets, "ep_lens": ep_lens}
+            # Be careful!!! if you change the downstream algorithm to aggregate
+            # several of these batches, then be sure to do a deepcopy
+            ep_rets = []
+            ep_lens = []
+        i = t % horizon
+        obs[i] = ob
+        vpreds[i] = vpred
+        news[i] = new
+        acs[i] = ac
+        prevacs[i] = prevac
+
+        ob, rew, new, _ = env.step(ac)
+        rews[i] = rew
+        next_obs[i] = ob
+
+        cur_ep_ret += rew
+        cur_ep_len += 1
+        timesteps_so_far += 1
+        if new:
+            ep_rets.append(cur_ep_ret)
+            ep_lens.append(cur_ep_len)
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
+        t += 1
 
 def traj_segment_generator(pi, env, horizon, stochastic):
     # Trajectories generators
@@ -102,23 +161,6 @@ def result_record():
 def compute_weight_decay(weight_decay, model_param_list):
     model_param_grid = np.array(model_param_list)
     return - weight_decay * np.mean(model_param_grid * model_param_grid, axis = 1)
-
-
-#TODO: Modify
-def uniform_select(weight, num_of_weights):
-    # Temporarily disabled uniform selection, essentially this is just pure index range from 0 to the maximimum
-    length = len(weight) if len(weight) < num_of_weights else \
-        num_of_weights
-    # index = np.random.choice(range(len(
-    #     weight)), length, replace = False)
-    index = range(length)
-    return index, np.take(weight, index)
-
-
-def set_uniform_weights(original_weight, new_weight, index):
-    result_weight = original_weight
-    np.put(result_weight, index, new_weight)
-    return result_weight
 
 
 def add_vtarg_and_adv(seg, gamma, lam):
@@ -297,7 +339,8 @@ def learn(env, policy_fn, *,
     pi_get_flat = U.GetFlat(pi.get_trainable_variables())
     backup_pi_get_flat = U.GetFlat(backup_pi.get_trainable_variables())
     pi_zero_get_flat = U.GetFlat(pi_zero.get_trainable_variables())
-
+    qf_adam.sync()
+    vf_adam.sync()
     adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
