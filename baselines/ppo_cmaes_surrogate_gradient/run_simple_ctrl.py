@@ -16,7 +16,7 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000000
-    popsize = 10
+    popsize = 50
     gensize = 500
     bounds = [-5.0, 5.0]
     sigma = 0.1
@@ -27,7 +27,7 @@ def train(env_id, num_timesteps, seed):
     def policy_fn(name, ob_space, ac_space):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space,
                                     ac_space=ac_space,
-                                    hid_size=16, num_hid_layers=1)
+                                    hid_size=32, num_hid_layers=2)
 
     env = make_simple_control_env(env_id, seed)
     pposgd_simple.learn(env, policy_fn,
@@ -38,9 +38,9 @@ def train(env_id, num_timesteps, seed):
                         sigma = sigma,
                         eval_iters = eval_iters,
                         max_timesteps=num_timesteps,
-                        timesteps_per_actorbatch=2048,
+                        timesteps_per_actorbatch=4096,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=20, optim_stepsize=3e-4,
+                        optim_epochs=64, optim_stepsize=3e-4,
                         optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)

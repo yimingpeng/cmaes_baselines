@@ -18,18 +18,18 @@ from baselines import logger
 
 
 def train(env_id, num_timesteps, seed):
-    max_fitness = 0
-    popsize = 32
-    gensize = 2000
+    max_fitness = -10000
+    popsize = 100
+    gensize = 500
     bounds = [-5.0, 5.0]
-    sigma = 0.01
-    eval_iters = 0.1
-    from baselines.ppo_cmaes_surrogate import mlp_policy, pposgd_simple
+    sigma = 0.005
+    eval_iters = 1
+    from baselines.ppo_cmaes_surrogate_gradient import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=32, num_hid_layers=2)
+            hid_size=64, num_hid_layers=2)
 
     env = make_pybullet_env(env_id, seed)
     pposgd_simple.learn(env,policy_fn,
@@ -42,7 +42,7 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=10, optim_stepsize=3e-4,
+                        optim_epochs=20, optim_stepsize=3e-4,
                         optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear',
                         seed=seed,
