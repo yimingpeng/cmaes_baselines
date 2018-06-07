@@ -12,6 +12,8 @@ currentdir = os.path.dirname(
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 
+# very important, don't remove, otherwise pybullet cannot run (reasons are unknown)
+import pybullet_envs
 from baselines.common.cmd_util import pybullet_arg_parser, make_pybullet_env
 from baselines.common import tf_util as U
 from baselines import logger
@@ -19,8 +21,8 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 32
-    gensize = 500
+    popsize = 64
+    gensize = 2000
     bounds = [-5.0, 5.0]
     sigma = 0.1
     eval_iters = 5
@@ -33,7 +35,9 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     base_env = make_pybullet_env(env_id, seed)
+    test_env = make_pybullet_env(env_id, seed)
     cmaes_simple.learn(base_env,
+                       test_env,
                        policy_fn,
                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                        popsize = popsize,
@@ -45,6 +49,7 @@ def train(env_id, num_timesteps, seed):
                        timesteps_per_actorbatch=2048,
                        seed=seed)
     base_env.close()
+    test_env.close()
 
 
 def main():

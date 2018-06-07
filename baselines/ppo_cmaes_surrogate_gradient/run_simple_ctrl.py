@@ -8,8 +8,8 @@ sys.path.append(
         os.path.join(
             os.path.abspath(os.path.join(os.getcwd(), os.pardir)), os.pardir)))
 
-from baselines.common.cmd_util import simple_ctrl_arg_parser, \
-    make_simple_control_env
+from baselines.common.cmd_util import gym_ctrl_arg_parser, \
+    make_gym_control_env
 from baselines.common import tf_util as U
 from baselines import logger
 
@@ -29,7 +29,7 @@ def train(env_id, num_timesteps, seed):
                                     ac_space=ac_space,
                                     hid_size=32, num_hid_layers=2)
 
-    env = make_simple_control_env(env_id, seed)
+    env = make_gym_control_env(env_id, seed)
     pposgd_simple.learn(env, policy_fn,
                         max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                         popsize = popsize,
@@ -48,7 +48,7 @@ def train(env_id, num_timesteps, seed):
 
 
 def main():
-    args = simple_ctrl_arg_parser().parse_args()
+    args = gym_ctrl_arg_parser().parse_args()
     logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PPO_CMAES-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 

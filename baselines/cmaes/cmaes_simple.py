@@ -81,6 +81,10 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     prevacs = acs.copy()
     ep_num = 0
     while True:
+        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
+            # backup_ob = np.copy(ob)
+            result_record(seg_gen)
+            # ob = backup_ob
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -109,10 +113,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         cur_ep_ret += rew
         cur_ep_len += 1
         timesteps_so_far += 1
-        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            backup_ob = np.copy(ob)
-            result_record(seg_gen)
-            ob = backup_ob
         if new:
             ep_num += 1
             ep_rets.append(cur_ep_ret)
@@ -151,6 +151,7 @@ def result_record(seg_gen):
 
 
 def learn(base_env,
+          test_env,
           policy_fn, *,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
@@ -198,7 +199,8 @@ def learn(base_env,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
-    seg_gen = traj_segment_generator_eval(backup_pi, base_env, timesteps_per_actorbatch, stochastic=True)
+    global seg_gen
+    seg_gen = traj_segment_generator_eval(backup_pi, test_env, timesteps_per_actorbatch, stochastic=True)
     actors = []
     best_fitness = 0
     for i in range(popsize):
