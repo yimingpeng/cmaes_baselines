@@ -132,7 +132,6 @@ def result_record(seg_gen):
     lens, rews = map(flatten_lists, zip(*listoflrpairs))
     lenbuffer.extend(lens)
     rewbuffer.extend(rews)
-    print(rewbuffer)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -226,19 +225,19 @@ def learn(base_env,
 
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
-            print("Max time steps")
+            logger.log("Max time steps")
             break
         elif max_episodes and episodes_so_far >= max_episodes:
-            print("Max episodes")
+            logger.log("Max episodes")
             break
         elif max_iters and iters_so_far >= max_iters:
-            print("Max iterations")
+            logger.log("Max iterations")
             break
         elif max_seconds and time.time() - tstart >= max_seconds:
-            print("Max time")
+            logger.log("Max time")
             break
         elif es.countiter >= opt['maxiter']:
-            print("Max generations")
+            logger.log("Max generations")
             break
         assign_backup_eq_new() # backup current policy
 
@@ -277,8 +276,8 @@ def learn(base_env,
         es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
         best_solution = np.copy(es.result[0])
         best_fitness = -es.result[1]
-        print("Generation:", es.countiter)
-        print("Best Solution Fitness:", best_fitness)
+        logger.log("Generation:", es.countiter)
+        logger.log("Best Solution Fitness:", best_fitness)
         pi_set_from_flat_params(best_solution)
 
         ob = ob_segs["ob"]
