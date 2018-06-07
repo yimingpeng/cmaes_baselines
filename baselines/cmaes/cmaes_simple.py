@@ -62,7 +62,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
 
 
 def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
-    global timesteps_so_far, best_fitness
+    global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
     new = True  # marks if we're on first timestep of an episode
@@ -110,7 +110,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         cur_ep_len += 1
         timesteps_so_far += 1
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(best_fitness, seg_gen)
+            backup_ob = np.copy(ob)
+            result_record(seg_gen)
+            ob = backup_ob
         if new:
             ep_num += 1
             ep_rets.append(cur_ep_ret)
@@ -121,7 +123,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         t += 1
 
 
-def result_record(best_fitness_so_far, seg_gen):
+def result_record(seg_gen):
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart
     eval_seg = seg_gen.__next__()
@@ -240,13 +242,14 @@ def learn(base_env,
             break
         assign_backup_eq_new() # backup current policy
 
-        logger.log("********** Iteration %i ************" % iters_so_far)
-        eval_seg = seg_gen.__next__()
-        lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
+        logger.log("********** Generation %i ************" % iters_so_far)
+        if iters_so_far == 0: # First test result at the beginning of training
+            eval_seg = seg_gen.__next__()
+            lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
+            listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+            lens, rews = map(flatten_lists, zip(*listoflrpairs))
+            lenbuffer.extend(lens)
+            rewbuffer.extend(rews)
 
         solutions = es.ask()
         if costs is not None:
