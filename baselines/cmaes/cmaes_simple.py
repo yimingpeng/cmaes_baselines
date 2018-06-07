@@ -61,7 +61,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     global timesteps_so_far, best_fitness
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -110,7 +110,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
         cur_ep_len += 1
         timesteps_so_far += 1
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(best_fitness)
+            result_record(best_fitness, seg_gen)
         if new:
             ep_num += 1
             ep_rets.append(cur_ep_ret)
@@ -121,11 +121,15 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
         t += 1
 
 
-def result_record(best_fitness_so_far):
+def result_record(best_fitness_so_far, seg_gen):
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart
-    logger.log("********** Iteration %i ************" % iters_so_far)
-    rewbuffer.append(best_fitness_so_far)
+    eval_seg = seg_gen.__next__()
+    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
+    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+    lens, rews = map(flatten_lists, zip(*listoflrpairs))
+    lenbuffer.extend(lens)
+    rewbuffer.extend(rews)
     print(rewbuffer)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
@@ -168,8 +172,8 @@ def learn(base_env,
     backup_pi = policy_fn("backup_pi", ob_space, ac_space)  # Construct a network for every individual to adapt during the es evolution
 
     U.initialize()
-    pi_set_flat = U.SetFromFlat(pi.get_trainable_variables())
-    pi_get_flat = U.GetFlat(pi.get_trainable_variables())
+    pi_set_from_flat_params = U.SetFromFlat(pi.get_trainable_variables())
+    pi_get_flat_params = U.GetFlat(pi.get_trainable_variables())
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer,best_fitness
@@ -183,26 +187,27 @@ def learn(base_env,
 
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                       for (backup_v, newv) in zipsame(
-            backup_pi.get_trainable_variables(), pi.get_trainable_variables())])
+            backup_pi.get_variables(), pi.get_variables())])
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
                                                       for (newv, backup_v) in zipsame(
-            pi.get_trainable_variables(), backup_pi.get_trainable_variables())])
+            pi.get_variables(), backup_pi.get_variables())])
+
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
+    seg_gen = traj_segment_generator_eval(backup_pi, base_env, timesteps_per_actorbatch, stochastic=True)
     actors = []
     best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, base_env,
                                           timesteps_per_actorbatch,
                                           stochastic = True,
-                                          eval_iters = eval_iters)
+                                          eval_iters = eval_iters, seg_gen=seg_gen)
         actors.append(newActor)
 
-    seg_gen = traj_segment_generator_eval(pi, base_env, timesteps_per_actorbatch, stochastic=True)
-    flatten_weights = pi_get_flat()
+    flatten_weights = pi_get_flat_params()
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
     opt['popsize'] = popsize
@@ -234,6 +239,8 @@ def learn(base_env,
             print("Max generations")
             break
         assign_backup_eq_new() # backup current policy
+
+        logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = seg_gen.__next__()
         lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
@@ -250,7 +257,7 @@ def learn(base_env,
         lens = []
         for id, solution in enumerate(solutions):
             # pi.set_Flat_variables(solution)
-            pi_set_flat(solution)
+            pi_set_from_flat_params(solution)
             seg = actors[id].__next__()
             costs.append(-np.mean(seg["ep_rets"]))
             lens.append(np.sum(seg["ep_lens"]))
@@ -269,11 +276,10 @@ def learn(base_env,
         best_fitness = -es.result[1]
         print("Generation:", es.countiter)
         print("Best Solution Fitness:", best_fitness)
-        pi_set_flat(best_solution)
+        pi_set_from_flat_params(best_solution)
 
-        # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob = ob_segs["ob"]
-        if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for policy
+        if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
 
         iters_so_far += 1
         episodes_so_far += sum(lens)

@@ -20,10 +20,10 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
-    gensize = 200
+    gensize = 500
     bounds = [-5.0, 5.0]
     sigma = 0.1
-    eval_iters = 3
+    eval_iters = 5
     from baselines.cmaes import mlp_policy, cmaes_simple
     U.make_session(num_cpu=1).__enter__()
 
