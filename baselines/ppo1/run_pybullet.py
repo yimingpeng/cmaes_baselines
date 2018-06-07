@@ -22,10 +22,11 @@ def train(env_id, num_timesteps, seed):
     U.make_session(num_cpu=1).__enter__()
     def policy_fn(name, ob_space, ac_space):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=16, num_hid_layers=1)
+            hid_size=64, num_hid_layers=2)
 
     env = make_pybullet_env(env_id, seed)
-    pposgd_simple.learn(env, policy_fn,
+    test_env = make_pybullet_env(env_id, seed)
+    pposgd_simple.learn(env,test_env, policy_fn,
             max_timesteps=num_timesteps,
             timesteps_per_actorbatch=2048,
             clip_param=0.2, entcoeff=0.0,
@@ -33,6 +34,7 @@ def train(env_id, num_timesteps, seed):
             gamma=0.99, lam=0.95, schedule='linear'
         )
     env.close()
+    test_env.close()
 
 def main():
     args = pybullet_arg_parser().parse_args()
