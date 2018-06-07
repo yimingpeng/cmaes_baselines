@@ -82,9 +82,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     ep_num = 0
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            # backup_ob = np.copy(ob)
             result_record(seg_gen)
-            # ob = backup_ob
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
