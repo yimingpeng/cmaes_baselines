@@ -235,10 +235,10 @@ def learn(base_env,
         elif max_seconds and time.time() - tstart >= max_seconds:
             logger.log("Max time")
             break
-        assign_backup_eq_new()  # backup current policy
 
         # Linearly decay the exploration
-        epsilon = max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
+        epsilon = max(0.1 - float(timesteps_so_far) / max_timesteps, 0)
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
 
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:  # First test result at the beginning of training
@@ -249,6 +249,7 @@ def learn(base_env,
             lenbuffer.extend(lens)
             rewbuffer.extend(rews)
         for i in range(len(layer_var_list)):
+            assign_backup_eq_new()  # backup current policy
             logger.log("Current Layer:"+ str(layer_var_list[i]))
             flatten_weights = layer_get_operate_list[i]()
             opt = cma.CMAOptions()
@@ -261,13 +262,13 @@ def learn(base_env,
             opt['AdaptSigma'] = False
             # opt['bounds'] = bounds
             es = cma.CMAEvolutionStrategy(flatten_weights,
-                                          sigma, opt)
+                                          sigma_adapted, opt)
             costs = None
             best_solution = None
 
             die_out_count = 0
             while True:
-                if es.countiter >= 5:
+                if es.countiter >= 10:
                     logger.log("Max generations for current layer")
                     break
                 solutions = es.ask()

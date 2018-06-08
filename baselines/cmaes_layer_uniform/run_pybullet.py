@@ -26,7 +26,7 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.1
     eval_iters = 3
-    from baselines.cmaes_layer_entire import mlp_policy, cmaes_simple
+    from baselines.cmaes_layer_uniform import mlp_policy, cmaes_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):

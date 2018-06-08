@@ -149,6 +149,16 @@ def result_record(seg_gen):
         logger.dump_tabular()
 
 
+def uniform_select(weights, proportion):
+    num_of_weights = int(proportion * len(weights))
+    assert num_of_weights != 0  # make sure there are something to be selected
+    length = len(weights) if len(weights) < num_of_weights else \
+        num_of_weights
+    index = np.random.choice(range(len(
+        weights)), length, replace = False)
+    return index, np.take(weights, index)
+
+
 def learn(base_env,
           test_env,
           policy_fn, *,
@@ -173,14 +183,13 @@ def learn(base_env,
     backup_pi = policy_fn("backup_pi", ob_space,
                           ac_space)  # Construct a network for every individual to adapt during the es evolution
 
-
     var_list = pi.get_trainable_variables()
     layer_var_list = []
     for i in range(pi.num_hid_layers):
         layer_var_list.append([v for v in var_list if v.name.split("/")[2].startswith(
-                'fc%i' % (i + 1))])
+            'fc%i' % (i + 1))])
     logstd_var_list = [v for v in var_list if v.name.split("/")[2].startswith(
-            "logstd")]
+        "logstd")]
     if len(logstd_var_list) != 0:
         layer_var_list.append([v for v in var_list if v.name.split("/")[2].startswith(
             "final")] + logstd_var_list)
@@ -222,6 +231,7 @@ def learn(base_env,
                                           stochastic = True,
                                           eval_iters = eval_iters, seg_gen = seg_gen)
         actors.append(newActor)
+    indices = []  # maintain all selected indices for each iteration
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -235,10 +245,10 @@ def learn(base_env,
         elif max_seconds and time.time() - tstart >= max_seconds:
             logger.log("Max time")
             break
-        assign_backup_eq_new()  # backup current policy
 
-        # Linearly decay the exploration
-        epsilon = max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
+        # Linearly decay the exploration and sigma
+        epsilon = max(0.1 - float(timesteps_so_far) / max_timesteps, 0)
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
 
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:  # First test result at the beginning of training
@@ -249,7 +259,8 @@ def learn(base_env,
             lenbuffer.extend(lens)
             rewbuffer.extend(rews)
         for i in range(len(layer_var_list)):
-            logger.log("Current Layer:"+ str(layer_var_list[i]))
+            assign_backup_eq_new()  # backup current policy
+            logger.log("Current Layer:" + str(layer_var_list[i]))
             flatten_weights = layer_get_operate_list[i]()
             opt = cma.CMAOptions()
             opt['tolfun'] = max_fitness
@@ -260,14 +271,27 @@ def learn(base_env,
             opt['seed'] = seed
             opt['AdaptSigma'] = False
             # opt['bounds'] = bounds
-            es = cma.CMAEvolutionStrategy(flatten_weights,
-                                          sigma, opt)
+            if len(indices) < len(layer_var_list):
+                selected_index, init_weights = uniform_select(flatten_weights,
+                                                              0.5)  # 0.5 means 50% proportion of params are selected
+                indices.append(selected_index)
+            else:
+                if np.random.randn() < epsilon:
+                    selected_index, init_weights = uniform_select(flatten_weights, 0.5)
+                    indices.append(selected_index)
+                    logger.log("Random: select new weights")
+                else:
+                    selected_index = indices[i]
+                    init_weights = np.take(flatten_weights, selected_index)
+
+            es = cma.CMAEvolutionStrategy(init_weights,
+                                          sigma_adapted, opt)
             costs = None
             best_solution = None
 
             die_out_count = 0
             while True:
-                if es.countiter >= 5:
+                if es.countiter >= 10:
                     logger.log("Max generations for current layer")
                     break
                 solutions = es.ask()
@@ -276,7 +300,8 @@ def learn(base_env,
                 costs = []
                 lens = []
                 for id, solution in enumerate(solutions):
-                    layer_set_operate_list[i](solution)
+                    np.put(flatten_weights, selected_index, solution)
+                    layer_set_operate_list[i](flatten_weights)
                     seg = actors[id].__next__()
                     costs.append(-np.mean(seg["ep_rets"]))
                     lens.append(np.sum(seg["ep_lens"]))
@@ -294,14 +319,16 @@ def learn(base_env,
                 if -es.result[1] > best_fitness:
                     best_solution = np.copy(es.result[0])
                     best_fitness = -es.result[1]
-                    layer_set_operate_list[i](best_solution)
+                    np.put(flatten_weights, selected_index, best_solution)
+                    layer_set_operate_list[i](flatten_weights)
                     logger.log("Update the layer")
                 else:
-                    logger.log("Epsilon = " +str(epsilon))
+                    logger.log("Epsilon = " + str(epsilon))
                     if np.random.randn() < epsilon:
                         best_solution = np.copy(es.result[0])
                         best_fitness = -es.result[1]
-                        layer_set_operate_list[i](best_solution)
+                        np.put(flatten_weights, selected_index, best_solution)
+                        layer_set_operate_list[i](flatten_weights)
                         logger.log("Random: Update the layer")
                     die_out_count += 1
                 if die_out_count >= 3:
