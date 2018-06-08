@@ -198,8 +198,8 @@ def learn(base_env,
     timesteps_so_far = 0
     iters_so_far = 0
     tstart = time.time()
-    lenbuffer = deque(maxlen = 50)  # rolling buffer for episode lengths
-    rewbuffer = deque(maxlen = 50)  # rolling buffer for episode rewards
+    lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
+    rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
 
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                          for (backup_v, newv) in zipsame(
