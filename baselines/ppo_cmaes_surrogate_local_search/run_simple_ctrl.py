@@ -21,7 +21,7 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.1
     eval_iters = 1
-    from baselines.ppo_cmaes_surrogate_gradient import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate_local_search import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
