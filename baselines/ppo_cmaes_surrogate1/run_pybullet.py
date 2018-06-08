@@ -24,7 +24,7 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.01
     eval_iters = 0.1
-    from baselines.ppo_cmaes_surrogate import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate1 import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
@@ -33,7 +33,7 @@ def train(env_id, num_timesteps, seed):
 
     env = make_pybullet_env(env_id, seed)
     pposgd_simple.learn(env,policy_fn,
-                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
+                        max_fitness = max_fitness,  # has to be negative, we use minization
                         popsize = popsize,
                         gensize = gensize,
                         bounds = bounds,
