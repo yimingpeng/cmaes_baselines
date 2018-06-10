@@ -15,11 +15,11 @@ from baselines import logger
 
 
 def train(env_id, num_timesteps, seed):
-    max_fitness = -100000000
-    popsize = 5
+    max_fitness = -100000
+    popsize = 32
     gensize = 2000
     bounds = [-5.0, 5.0]
-    sigma = 0.1
+    sigma = 0.01
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1 import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
@@ -27,7 +27,7 @@ def train(env_id, num_timesteps, seed):
     def policy_fn(name, ob_space, ac_space):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space,
                                     ac_space=ac_space,
-                                    hid_size=16, num_hid_layers=1)
+                                    hid_size=64, num_hid_layers=2)
 
     env = make_gym_control_env(env_id, seed)
     pposgd_simple.learn(env, policy_fn,
@@ -38,10 +38,10 @@ def train(env_id, num_timesteps, seed):
                         sigma = sigma,
                         eval_iters = eval_iters,
                         max_timesteps=num_timesteps,
-                        timesteps_per_actorbatch=4096,
+                        timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
                         optim_epochs=10, optim_stepsize=3e-4,
-                        optim_batchsize=256,
+                        optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)
     env.close()
