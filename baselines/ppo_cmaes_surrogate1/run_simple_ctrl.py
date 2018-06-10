@@ -17,8 +17,9 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
-    gensize = 2000
+    gensize = 20 # gen size for each iteration
     bounds = [-5.0, 5.0]
+    max_v_train_iter = 10
     sigma = 0.01
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1 import mlp_policy, pposgd_simple
@@ -30,13 +31,15 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     env = make_gym_control_env(env_id, seed)
-    pposgd_simple.learn(env, policy_fn,
+    test_env = make_gym_control_env(env_id, seed)
+    pposgd_simple.learn(env, test_env, policy_fn,
                         max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                         popsize = popsize,
                         gensize = gensize,
                         bounds = bounds,
                         sigma = sigma,
                         eval_iters = eval_iters,
+                        max_v_train_iter = max_v_train_iter,
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
@@ -45,6 +48,7 @@ def train(env_id, num_timesteps, seed):
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)
     env.close()
+    test_env.close()
 
 
 def main():
