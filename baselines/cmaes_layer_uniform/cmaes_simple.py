@@ -291,7 +291,7 @@ def learn(base_env,
 
             die_out_count = 0
             while True:
-                if es.countiter >= 10:
+                if es.countiter >= gensize:
                     logger.log("Max generations for current layer")
                     break
                 solutions = es.ask()

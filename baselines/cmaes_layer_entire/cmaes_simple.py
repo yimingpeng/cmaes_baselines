@@ -216,12 +216,6 @@ def learn(base_env,
     seg_gen = traj_segment_generator_eval(backup_pi, test_env, timesteps_per_actorbatch, stochastic = True)
     actors = []
     best_fitness = -np.inf
-    for i in range(popsize):
-        newActor = traj_segment_generator(pi, base_env,
-                                          timesteps_per_actorbatch,
-                                          stochastic = True,
-                                          eval_iters = eval_iters, seg_gen = seg_gen)
-        actors.append(newActor)
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -268,7 +262,7 @@ def learn(base_env,
 
             die_out_count = 0
             while True:
-                if es.countiter >= 10:
+                if es.countiter >= gensize:
                     logger.log("Max generations for current layer")
                     break
                 solutions = es.ask()
