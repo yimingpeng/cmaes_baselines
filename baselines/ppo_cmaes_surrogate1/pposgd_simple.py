@@ -373,7 +373,6 @@ def learn(env, test_env, policy_fn, *,
 
             assign_backup_eq_new()  # backup current policy
 
-            top_idx = np.array(seg["ep_rets"]).argsort()[-10:]
             for id, solution in enumerate(solutions):
                 set_pi_flat_params(solution)
                 losses = []
@@ -383,7 +382,6 @@ def learn(env, test_env, policy_fn, *,
             # Weights decay
             l2_decay = compute_weight_decay(0.99, solutions)
             costs += l2_decay
-            # costs, real_costs = fitness_normalization(costs)
             costs, real_costs = fitness_rank(costs)
             es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
             best_solution = es.result[0]

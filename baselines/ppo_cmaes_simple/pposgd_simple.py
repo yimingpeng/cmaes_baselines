@@ -208,27 +208,6 @@ def learn(env, policy_fn, *,
     vf_losses = [vf_loss]
 
     var_list = pi.get_trainable_variables()
-    # print(var_list)
-    if isinstance(pi, CnnPolicy):
-        lin_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-            "lin")]
-        vf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-            "logits")]
-        pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-            "value")]
-        # Policy + Value function, the final layer, all trainable variables
-        # Remove vf variables
-        var_list = lin_var_list + pol_var_list
-    else:
-        fc2_var_list = [v for v in var_list if v.name.split("/")[2].startswith(
-            "fc2")]
-        final_var_list = [v for v in var_list if v.name.split("/")[
-            2].startswith(
-            "final")]
-        # var_list = vf_var_list + pol_var_list
-        var_list = fc2_var_list + final_var_list
-        logger.log(var_list)
-    # print(var_list)
     qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "qf")]
     mean_qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
@@ -368,6 +347,7 @@ def learn(env, policy_fn, *,
         #                    reward=reward,
         #                    mean_actions=mean_pi_actions(ob)[0]),
         #                    shuffle = not pi.recurrent)
+
         # Random select transitions to train Q
         # for _ in range(optim_epochs):
         #     losses = []  # list of tuples, each of which gives the loss for a minibatch

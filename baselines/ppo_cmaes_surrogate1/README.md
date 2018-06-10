@@ -1,4 +1,4 @@
-# PPOSGD_CMAES
+# PPOSGD_CMAES Surrogate 1
 # CMAES used to train the policy, the objective function is using the PPO surrogate objective
 
 Created by Yiming
