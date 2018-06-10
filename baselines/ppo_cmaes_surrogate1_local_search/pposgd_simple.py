@@ -241,8 +241,12 @@ def learn(env, test_env, policy_fn, *,
 
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                                 losses + [U.flatgrad(vf_loss, vf_var_list)])
+    pol_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
+                                losses + [U.flatgrad(pol_loss, pol_var_list)])
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
+    pol_adam = MpiAdam(pol_var_list, epsilon = adam_epsilon)
+
 
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
@@ -265,6 +269,7 @@ def learn(env, test_env, policy_fn, *,
     set_pi_flat_params = U.SetFromFlat(pol_var_list)
 
     vf_adam.sync()
+    pol_adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, tstart, ppo_timesteps_so_far, best_fitness
@@ -389,6 +394,18 @@ def learn(env, test_env, policy_fn, *,
             logger.log("Best Solution Fitness:" + str(best_fitness))
             set_pi_flat_params(best_solution)
 
+        # Local search for policy (gradient)
+        logger.log("Optimizing Policy...")
+        logger.log(fmt_row(13, loss_names))
+        # Here we do a bunch of optimization epochs over the data
+        for _ in range(optim_epochs):
+            losses = [] # list of tuples, each of which gives the loss for a minibatch
+            for batch in d.iterate_once(optim_batchsize):
+                *newlosses, g = pol_lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"],
+                                                cur_lrmult)
+                pol_adam.update(g, optim_stepsize * cur_lrmult)
+                losses.append(newlosses)
+            logger.log(fmt_row(13, np.mean(losses, axis=0)))
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
