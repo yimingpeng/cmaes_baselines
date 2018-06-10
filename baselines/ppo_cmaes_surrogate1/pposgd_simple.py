@@ -345,7 +345,7 @@ def learn(env, test_env, policy_fn, *,
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(vf_losses)
-            logger.log(fmt_row(13, np.mean(losses, axis = 0)))
+                logger.log(fmt_row(13, np.mean(losses, axis = 0)))
 
         # CMAES Train Policy
         assign_old_eq_new()  # set old parameter values to new parameter values
