@@ -1,7 +1,7 @@
 # PPOSGD_CMAES Surrogate 1
 # CMAES used to train the policy, the objective function is using the PPO surrogate objective
-
-Created by Yiming
+# Add UCB for explorasively select between real evaluation and surrogate models
+Created by Yimingl
 
 1. New Implementation with new fitness function
 2. CMAES train the entire policy layer

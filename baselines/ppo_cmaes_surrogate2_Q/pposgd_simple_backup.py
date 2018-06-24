@@ -199,6 +199,7 @@ def learn(env, test_env, policy_fn, *,
     oldpi = policy_fn("oldpi", ob_space, ac_space)  # Network for old policy
     backup_pi = policy_fn("backup_pi", ob_space,
                           ac_space)  # Construct a network for every individual to adapt during the es evolution
+    pi_zero = policy_fn("zero_pi", ob_space, ac_space)  # pi_0 will only be updated along with iterations
 
     reward = tf.placeholder(dtype = tf.float32, shape = [None])  # step rewards
     pi_params = tf.placeholder(dtype = tf.float32, shape = [None])
@@ -225,39 +226,43 @@ def learn(env, test_env, policy_fn, *,
     meanent = tf.reduce_mean(ent)
     pol_entpen = (-entcoeff) * meanent
 
-    pi_adv = pi.qpred - pi.vpred
+    param_dist = tf.reduce_mean(tf.square(pi_params - old_pi_params))
+    mean_action_loss = tf.cast(tf.reduce_mean(tf.square(1.0 - pi.pd.mode() / oldpi.pd.mode())), tf.float32)
+
+    pi_adv = (pi.qpred - pi.vpred)
     adv_mean, adv_var = tf.nn.moments(pi_adv, axes = [0])
     normalized_pi_adv = (pi_adv - adv_mean) / tf.sqrt(adv_var)
 
     ratio = tf.exp(pi.pd.logp(ac) - oldpi.pd.logp(ac))  # pnew / pold
-    surr1 = ratio * normalized_pi_adv  # surrogate from conservative policy iteration
-    surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * normalized_pi_adv  #
+    surr1 = ratio * atarg  # surrogate from conservative policy iteration
+    surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
 
-    qf_loss = tf.reduce_mean(tf.square(reward + gamma * pi.mean_qpred - pi.qpred))
-
-    # qf_loss = tf.reduce_mean(U.huber_loss(pi.qpred - tf.stop_gradient(reward + gamma * pi.mean_qpred)))
+    # qf_loss = tf.reduce_mean(tf.square(reward + gamma * pi.mean_qpred - pi.qpred))
+    qf_loss = tf.reduce_mean(U.huber_loss(reward + gamma * pi.mean_qpred - pi.qpred))
     vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
     qf_losses = [qf_loss]
     vf_losses = [vf_loss]
-
-    # pol_loss = -tf.reduce_mean(pi_adv)
     pol_loss = pol_surr + pol_entpen
-    losses = [pol_surr, pol_entpen, vf_loss, meankl, meanent]
-    loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
+    # pol_loss = pol_surr + pol_entpen
+
+    # Advantage function should be improved
+    losses = [pol_loss, pol_entpen, meankl, meanent]
+    loss_names = ["pol_surr_2", "pol_entpen", "kl", "ent"]
 
     var_list = pi.get_trainable_variables()
-    vf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-        "vf")]
-    pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-        "pol")]
     qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "qf")]
     mean_qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "meanqf")]
+    vf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
+        "vf")]
+    pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
+        "pol")]
 
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
-                                losses + [U.flatgrad(vf_loss, vf_var_list)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
+
     qf_lossandgrad = U.function([ob, ac, next_ob, mean_ac, lrmult, reward, atarg],
                                 qf_losses + [U.flatgrad(qf_loss, qf_var_list)])
 
@@ -279,11 +284,10 @@ def learn(env, test_env, policy_fn, *,
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
                                                          for (newv, backup_v) in zipsame(
             pi.get_variables(), backup_pi.get_variables())])
-    # Compute all losses
 
-    mean_pi_actions = U.function([ob], [pi.pd.mode()])
-    compute_pol_losses = U.function([ob, ac, atarg, ret, lrmult],
-                                    [pol_loss, pol_surr, pol_entpen, meankl])
+    mean_pi_actions = U.function([ob], [pi.pd.mode()])  # later for computing pol_loss
+    # Compute all losses
+    compute_pol_losses = U.function([ob, ob, ac, lrmult, atarg], [pol_loss])
 
     U.initialize()
 
@@ -291,6 +295,7 @@ def learn(env, test_env, policy_fn, *,
     set_pi_flat_params = U.SetFromFlat(pol_var_list)
 
     vf_adam.sync()
+    qf_adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, tstart, ppo_timesteps_so_far, best_fitness
@@ -303,13 +308,14 @@ def learn(env, test_env, policy_fn, *,
     lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
     rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
 
+    best_fitness = np.inf
+
     eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True,
                                      eval_gen = eval_gen)  # For train V Func
 
     # Build generator for all solutions
     actors = []
-    best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, env,
                                           timesteps_per_actorbatch,
@@ -345,6 +351,7 @@ def learn(env, test_env, policy_fn, *,
 
         # Generate new samples
         # Train V func
+        ob_segs = None
         for i in range(max_v_train_iter):
             logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
             logger.log("Generate New Samples")
@@ -389,6 +396,10 @@ def learn(env, test_env, policy_fn, *,
 
             assign_target_q_eq_eval_q()
 
+        pi0_fitness = compute_pol_losses(ob, ob, mean_pi_actions(ob)[0], cur_lrmult, atarg)
+        logger.log("Best fitness for Pi0:" + str(np.mean(atarg)))
+        logger.log("Best fitness for Pi0:" + str(pi0_fitness))
+
         # CMAES Train Policy
         assign_old_eq_new()  # set old parameter values to new parameter values
         assign_backup_eq_new()  # backup current policy
@@ -414,22 +425,25 @@ def learn(env, test_env, policy_fn, *,
             lens = []
 
             assign_backup_eq_new()  # backup current policy
-
             for id, solution in enumerate(solutions):
                 set_pi_flat_params(solution)
                 losses = []
-                cost = compute_pol_losses(ob, ac, atarg, tdlamret, cur_lrmult)
+                # cost = compute_pol_losses(ob_segs['ob'], ob_segs['ob'], mean_pi_actions(ob_segs['ob'])[0])
+                cost = compute_pol_losses(ob, ob, mean_pi_actions(ob)[0], cur_lrmult, atarg)
                 costs.append(cost[0])
                 assign_new_eq_backup()
             # Weights decay
             l2_decay = compute_weight_decay(0.99, solutions)
             costs += l2_decay
+            # costs, real_costs = fitness_normalization(costs)
             costs, real_costs = fitness_rank(costs)
             es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
+            logger.log("best_fitness:"+str(best_fitness) + " current best fitness:"+str(es.result[1]))
             best_solution = es.result[0]
             best_fitness = es.result[1]
             logger.log("Best Solution Fitness:" + str(best_fitness))
             set_pi_flat_params(best_solution)
+        sigma = es.sigma
 
         iters_so_far += 1
         episodes_so_far += sum(lens)
@@ -442,7 +456,6 @@ def fitness_rank(x):
     ranks /= (len(x) - 1)
     ranks -= .5
     return ranks, x
-
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]

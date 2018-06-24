@@ -22,7 +22,7 @@ def train(env_id, num_timesteps, seed):
     max_v_train_iter = 10
     sigma = 0.01
     eval_iters = 1
-    from baselines.ppo_cmaes_surrogate2_Q import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate2_V import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):

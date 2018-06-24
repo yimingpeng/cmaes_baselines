@@ -250,10 +250,10 @@ def learn(env, test_env, policy_fn, *,
 
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                          for (backup_v, newv) in zipsame(
-            backup_pi.get_trainable_variables(), pi.get_trainable_variables())])
+            backup_pi.get_variables(), pi.get_variables())])
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
                                                          for (newv, backup_v) in zipsame(
-            pi.get_trainable_variables(), backup_pi.get_trainable_variables())])
+            pi.get_variables(), backup_pi.get_variables())])
     # Compute all losses
 
     compute_pol_losses = U.function([ob, ac, atarg, ret, lrmult],
@@ -397,6 +397,8 @@ def fitness_rank(x):
     x = np.asarray(x).flatten()
     ranks = np.empty(len(x))
     ranks[x.argsort()] = np.arange(len(x))
+    ranks /= (len(x) - 1)
+    ranks -= .5
     return ranks, x
 
 

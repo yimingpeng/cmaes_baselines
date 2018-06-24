@@ -202,23 +202,15 @@ def learn(env, test_env, policy_fn, *,
     pi_zero = policy_fn("zero_pi", ob_space, ac_space)  # pi_0 will only be updated along with iterations
 
     reward = tf.placeholder(dtype = tf.float32, shape = [None])  # step rewards
-    pi_params = tf.placeholder(dtype = tf.float32, shape = [None])
-    old_pi_params = tf.placeholder(dtype = tf.float32, shape = [None])
     atarg = tf.placeholder(dtype = tf.float32, shape = [None])  # Target advantage function (if applicable)
     ret = tf.placeholder(dtype = tf.float32, shape = [None])  # Empirical return
 
     lrmult = tf.placeholder(name = 'lrmult', dtype = tf.float32,
                             shape = [])  # learning rate multiplier, updated with schedule
 
-    bound_coeff = tf.placeholder(name = 'bound_coeff', dtype = tf.float32,
-                                 shape = [])  # learning rate multiplier, updated with schedule
-
-    clip_param = clip_param * lrmult  # Annealed cliping parameter epislon
-
     ob = U.get_placeholder_cached(name = "ob")
     next_ob = U.get_placeholder_cached(name = "next_ob")  # next step observation for updating q function
     ac = U.get_placeholder_cached(name = "act")  # action placeholder for computing q function
-    mean_ac = U.get_placeholder_cached(name = "mean_act")  # action placeholder for computing q function
 
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
@@ -226,21 +218,16 @@ def learn(env, test_env, policy_fn, *,
     meanent = tf.reduce_mean(ent)
     pol_entpen = (-entcoeff) * meanent
 
-    param_dist = tf.reduce_mean(tf.square(pi_params - old_pi_params))
-    mean_action_loss = tf.cast(tf.reduce_mean(tf.square(1.0 - pi.pd.mode()/oldpi.pd.mode())), tf.float32)
 
     pi_adv = pi.qpred - pi.vpred
+    adv_mean, adv_var = tf.nn.moments(pi_adv, axes = [0])
+    normalized_pi_adv = (pi_adv - adv_mean) / tf.sqrt(adv_var)
 
-    ratio = tf.exp(pi.pd.logp(ac) - oldpi.pd.logp(ac))  # pnew / pold
-    surr1 = ratio * pi_adv  # surrogate from conservative policy iteration
-    surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * pi_adv  #
-    pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-
-    qf_loss = tf.reduce_mean(tf.square(reward + gamma * pi.mean_qpred - pi.qpred))
+    qf_loss = tf.reduce_mean(tf.square(reward + gamma * pi.vpred - pi.qpred))
     vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
     qf_losses = [qf_loss]
     vf_losses = [vf_loss]
-    pol_loss = pol_surr + pol_entpen
+    pol_loss = -tf.reduce_mean(normalized_pi_adv)
 
     # Advantage function should be improved
     losses = [pol_loss, pol_entpen, meankl, meanent]
@@ -249,8 +236,6 @@ def learn(env, test_env, policy_fn, *,
     var_list = pi.get_trainable_variables()
     qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "qf")]
-    mean_qf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
-        "meanqf")]
     vf_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "vf")]
     pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
@@ -259,16 +244,12 @@ def learn(env, test_env, policy_fn, *,
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
 
-    qf_lossandgrad = U.function([ob, ac, next_ob, mean_ac, lrmult, reward],
+    qf_lossandgrad = U.function([ob, ac, next_ob, lrmult, reward],
                                 qf_losses + [U.flatgrad(qf_loss, qf_var_list)])
 
     qf_adam = MpiAdam(qf_var_list, epsilon = adam_epsilon)
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
-
-    assign_target_q_eq_eval_q = U.function([], [], updates = [tf.assign(target_q, eval_q)
-                                                              for (target_q, eval_q) in zipsame(
-            mean_qf_var_list, qf_var_list)])
 
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
@@ -276,14 +257,14 @@ def learn(env, test_env, policy_fn, *,
 
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                          for (backup_v, newv) in zipsame(
-            backup_pi.get_trainable_variables(), pi.get_trainable_variables())])
+            backup_pi.get_variables(), pi.get_variables())])
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
                                                          for (newv, backup_v) in zipsame(
-            pi.get_trainable_variables(), backup_pi.get_trainable_variables())])
+            pi.get_variables(), backup_pi.get_variables())])
     # Compute all losses
 
     mean_pi_actions = U.function([ob], [pi.pd.mode()]) # later for computing pol_loss
-    compute_pol_losses = U.function([ob, ob, ac, lrmult],[pol_loss])
+    compute_pol_losses = U.function([ob, next_ob, ac],[pol_loss])
 
     U.initialize()
 
@@ -291,6 +272,7 @@ def learn(env, test_env, policy_fn, *,
     set_pi_flat_params = U.SetFromFlat(pol_var_list)
 
     vf_adam.sync()
+    qf_adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, tstart, ppo_timesteps_so_far, best_fitness
@@ -367,34 +349,26 @@ def learn(env, test_env, policy_fn, *,
             for _ in range(optim_epochs):
                 losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
-                    *vf_losses, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"],
+                    *vf_losses, g = vf_lossandgrad( batch["ob"],batch["ac"], batch["atarg"], batch["vtarg"],
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(vf_losses)
                 logger.log(fmt_row(13, np.mean(losses, axis = 0)))
 
-            # random_idx = []
-            # len_repo = len(ob)
-            # optim_epochs_q = int(len_repo / optim_batchsize) if int(
-            #     len_repo / optim_batchsize) > optim_epochs else optim_epochs
-            # for _ in range(optim_epochs_q):
-            #     random_idx.append(np.random.choice(range(len_repo), optim_batchsize))
-
-            d_q = Dataset(dict(ob = ob, ac = ac, next_ob = next_ob, reward = reward, atarg = atarg, vtarg = tdlamret), shuffle = not pi.recurrent)
+            d_q = Dataset(dict(ob = ob, ac = ac, next_ob = next_ob, reward = reward,
+                               atarg = atarg, vtarg = tdlamret), shuffle = not pi.recurrent)
 
             # Re-train q function
             logger.log("Training Q Func Evaluating Q Func Losses")
             for _ in range(optim_epochs):
                 losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d_q.iterate_once(optim_batchsize):
-                    *qf_losses, g = qf_lossandgrad(batch["ob"],  batch["ac"], batch["next_ob"],
-                                                   mean_pi_actions(batch["ob"])[0],
+                    *qf_losses, g = qf_lossandgrad(batch["next_ob"],  batch["ac"], batch["ob"],
                                                    cur_lrmult, batch["reward"])
                     qf_adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(qf_losses)
                 logger.log(fmt_row(13, np.mean(losses, axis = 0)))
 
-            assign_target_q_eq_eval_q()
 
         # CMAES Train Policy
         assign_old_eq_new()  # set old parameter values to new parameter values
@@ -425,7 +399,7 @@ def learn(env, test_env, policy_fn, *,
             for id, solution in enumerate(solutions):
                 set_pi_flat_params(solution)
                 losses = []
-                cost = compute_pol_losses(ob, ob, mean_pi_actions(ob)[0], cur_lrmult)
+                cost = compute_pol_losses(ob, ob, mean_pi_actions(ob)[0])
                 costs.append(cost[0])
                 assign_new_eq_backup()
             # Weights decay
@@ -447,7 +421,10 @@ def fitness_rank(x):
     x = np.asarray(x).flatten()
     ranks = np.empty(len(x))
     ranks[x.argsort()] = np.arange(len(x))
+    ranks /= (len(x) - 1)
+    ranks -= .5
     return ranks, x
+
 
 
 def flatten_lists(listoflists):

@@ -22,11 +22,11 @@ def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
     gensize = 20 # For each iteration
-    max_v_train_iter = 10
+    max_v_train_iter = 5
     bounds = [-5.0, 5.0]
     sigma = 0.01
     eval_iters = 0.1
-    from baselines.ppo_cmaes_surrogate2_Q import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate2_V import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
