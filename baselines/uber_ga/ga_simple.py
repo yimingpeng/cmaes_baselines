@@ -154,7 +154,7 @@ def learn(base_env,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
           gensize,
-          bounds,
+          truncation_size,
           sigma,
           eval_iters,
           timesteps_per_actorbatch,
@@ -209,20 +209,11 @@ def learn(base_env,
         actors.append(newActor)
 
     flatten_weights = pi_get_flat_params()
-    opt = cma.CMAOptions()
-    opt['tolfun'] = max_fitness
-    opt['popsize'] = popsize
-    opt['maxiter'] = gensize
-    opt['verb_disp'] = 0
-    opt['verb_log'] = 0
-    opt['seed'] = seed
-    opt['AdaptSigma'] = False
-    # opt['bounds'] = bounds
-    es = cma.CMAEvolutionStrategy(flatten_weights,
-                                  sigma, opt)
-    costs = None
-    best_solution = None
-
+    indv_len = len(flatten_weights)
+    pop = {}
+    pop["solutions"] = np.random.randn(popsize, indv_len)
+    pop["fitness"] = np.empty([popsize, 1], dtype = float)
+    gen_counter = 0
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -231,14 +222,15 @@ def learn(base_env,
             logger.log("Max episodes")
             break
         elif max_iters and iters_so_far >= max_iters:
-            logger.log("Max iterations")
+            logger.log("Max iterations (Generations)")
             break
         elif max_seconds and time.time() - tstart >= max_seconds:
             logger.log("Max time")
             break
-        elif es.countiter >= opt['maxiter']:
-            logger.log("Max generations")
+        elif gen_counter >= gensize:
+            logger.log("Max iterations (Generations)")
             break
+
         assign_backup_eq_new() # backup current policy
 
         logger.log("********** Generation %i ************" % iters_so_far)
@@ -250,39 +242,38 @@ def learn(base_env,
             lenbuffer.extend(lens)
             rewbuffer.extend(rews)
 
-        solutions = es.ask()
-        if costs is not None:
-            solutions[np.argmax(costs)] = np.copy(best_solution)
         ob_segs = None
-        segs = []
-        costs = []
-        lens = []
-        for id, solution in enumerate(solutions):
-            # pi.set_Flat_variables(solution)
-            pi_set_from_flat_params(solution)
-            seg = actors[id].__next__()
-            costs.append(-np.mean(seg["ep_rets"]))
-            lens.append(np.sum(seg["ep_lens"]))
-            segs.append(seg)
+        for i in range(popsize):
+            # First generation
+            if gen_counter == 0:
+                pi_set_from_flat_params(pop["solutions"][i])
+                seg = actors[i].__next__()
+                pop["fitness"][i] = np.mean(seg["ep_rets"])
+            else:
+                if i != 0:
+                    k = np.random.choice(truncation_size, 1)
+                    pop["solutions"][i] = pop["solutions"][k] + sigma * np.random.randn(1, indv_len)
+                    pi_set_from_flat_params(pop["solutions"][i])
+                    seg = actors[i].__next__()
+                    pop["fitness"][i] = np.mean(seg["ep_rets"])
+
             if ob_segs is None:
                 ob_segs = {'ob': np.copy(seg['ob'])}
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
             assign_new_eq_backup()
-        # Weights decay
-        l2_decay = compute_weight_decay(0.999, solutions)
-        costs += l2_decay
-        costs, real_costs = fitness_normalization(costs)
-        es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
-        best_solution = np.copy(es.result[0])
-        best_fitness = -es.result[1]
-        logger.log("Generation:", es.countiter)
-        logger.log("Best Solution Fitness:", best_fitness)
-        pi_set_from_flat_params(best_solution)
+        fit_idx = pop["fitness"].flatten().argsort()[::-1][:popsize]
+        pop["solutions"] = pop["solutions"][fit_idx]
+        pop["fitness"] = pop["fitness"][fit_idx]
+
+        logger.log("Generation:", gen_counter)
+        logger.log("Best Solution Fitness:", pop["fitness"][0])
+        pi_set_from_flat_params(pop["solutions"][0])
 
         ob = ob_segs["ob"]
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
 
+        gen_counter += 1
         iters_so_far += 1
         episodes_so_far += sum(lens)
 

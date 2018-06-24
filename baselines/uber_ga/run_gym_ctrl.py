@@ -15,11 +15,11 @@ from baselines import logger
 
 
 def train(env_id, num_timesteps, seed):
-    max_fitness = -10000
-    popsize = 32
+    max_fitness = -100000
+    popsize = 33
     gensize = 2000
-    bounds = [-5.0, 5.0]
-    sigma = 0.1
+    truncation_size = 5
+    sigma = 0.01
     eval_iters = 3
     from baselines.uber_ga import mlp_policy, ga_simple
     U.make_session(num_cpu=1).__enter__()
@@ -37,7 +37,7 @@ def train(env_id, num_timesteps, seed):
                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                        popsize = popsize,
                        gensize = gensize,
-                       bounds = bounds,
+                       truncation_size = truncation_size,
                        sigma = sigma,
                        eval_iters = eval_iters,
                        max_timesteps=num_timesteps,
