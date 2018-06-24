@@ -154,8 +154,8 @@ def learn(base_env,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
           gensize,
-          truncation_size,
           sigma,
+          alpha,
           eval_iters,
           timesteps_per_actorbatch,
           max_timesteps = 0,
@@ -211,8 +211,7 @@ def learn(base_env,
     flatten_weights = pi_get_flat_params()
     indv_len = len(flatten_weights)
     pop = {}
-    pop["solutions"] = np.random.randn(popsize, indv_len)
-    pop["fitness"] = np.empty([popsize, 1], dtype = float)
+    pop["fitness"] = np.empty([popsize, 1], dtype = np.float)
     gen_counter = 0
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -243,32 +242,25 @@ def learn(base_env,
             rewbuffer.extend(rews)
 
         ob_segs = None
+        # generate solutions
+        pop["solutions"] = flatten_weights * np.ones((popsize,1))
+        pop["noises"] = np.random.randn(popsize, indv_len)
+        pop["solutions"] = pop["solutions"] + sigma * pop["noises"]
         for i in range(popsize):
-            # First generation
-            if gen_counter == 0:
-                pi_set_from_flat_params(pop["solutions"][i])
-                seg = actors[i].__next__()
-                pop["fitness"][i] = np.mean(seg["ep_rets"])
-            else:
-                if i != 0:
-                    k = np.random.choice(truncation_size, 1)
-                    pop["solutions"][i] = pop["solutions"][k] + sigma * np.random.randn(1, indv_len)
-                    pi_set_from_flat_params(pop["solutions"][i])
-                    seg = actors[i].__next__()
-                    pop["fitness"][i] = np.mean(seg["ep_rets"])
-
+            pi_set_from_flat_params(pop["solutions"][i])
+            seg = actors[i].__next__()
+            pop["fitness"][i] = np.mean(seg["ep_rets"])
             if ob_segs is None:
                 ob_segs = {'ob': np.copy(seg['ob'])}
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
             assign_new_eq_backup()
-        fit_idx = pop["fitness"].flatten().argsort()[::-1][:popsize]
-        pop["solutions"] = pop["solutions"][fit_idx]
-        pop["fitness"], real_fitness = fitness_normalization(pop["fitness"][fit_idx])
 
+        pop["fitness"], real_costs = fitness_normalization(pop["fitness"])
+        flatten_weights = flatten_weights + alpha/sigma * np.mean(pop["fitness"].reshape(32, 1) * pop["noises"], axis = 0)
         logger.log("Generation:", gen_counter)
-        logger.log("Best Solution Fitness:", real_fitness[0])
-        pi_set_from_flat_params(pop["solutions"][0])
+        logger.log("Best Solution Fitness:", real_costs[pop["fitness"].flatten().argsort()[::-1][0]])
+        pi_set_from_flat_params(flatten_weights)
 
         ob = ob_segs["ob"]
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
