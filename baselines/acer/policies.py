@@ -77,3 +77,5 @@ class AcerLstmPolicy(object):
             return a0, pi0, s
 
         self.step = step
+
+
