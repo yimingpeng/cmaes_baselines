@@ -13,7 +13,6 @@ from mpi4py import MPI
 
 def result_record():
     global episode_rewards_history, t, epoch, start_time
-    print(episode_rewards_history)
     if len(episode_rewards_history) == 0:
         # TODO: Add pong game checking
         mean_rewbuffer = 0
