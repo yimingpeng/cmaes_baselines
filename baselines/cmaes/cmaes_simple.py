@@ -126,7 +126,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
 
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
-        episodes_so_far, tstart
+        episodes_so_far, tstart,best_fitness
+    # if best_fitness != -np.inf:
+    #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -283,6 +285,8 @@ def learn(base_env,
         es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
         best_solution = np.copy(es.result[0])
         best_fitness = -es.result[1]
+        rewbuffer.extend(es.result[3]["ep_rets"])
+        lenbuffer.extend(es.result[3]["ep_lens"])
         logger.log("Generation:", es.countiter)
         logger.log("Best Solution Fitness:", best_fitness)
         pi_set_from_flat_params(best_solution)
