@@ -16,7 +16,7 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 33
+    popsize = 129
     gensize = 2000
     truncation_size = 5
     sigma = 0.01
@@ -49,7 +49,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

@@ -21,7 +21,7 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 33
+    popsize = 129
     gensize = 2000
     truncation_size = 5
     sigma = 0.01
@@ -35,9 +35,7 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     base_env = make_pybullet_env(env_id, seed)
-    test_env = make_pybullet_env(env_id, seed)
     ga_simple.learn(base_env,
-                       test_env,
                        policy_fn,
                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                        popsize = popsize,
@@ -49,12 +47,11 @@ def train(env_id, num_timesteps, seed):
                        timesteps_per_actorbatch=2048,
                        seed=seed)
     base_env.close()
-    test_env.close()
 
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
