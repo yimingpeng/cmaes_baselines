@@ -6,6 +6,8 @@ import functools
 import collections
 import multiprocessing
 
+from tensorflow.python import debug as tf_debug
+
 def switch(condition, then_expression, else_expression):
     """Switches between two operations depending on a scalar value (int or bool).
     Note that both `then_expression` and `else_expression`
@@ -60,6 +62,7 @@ def make_session(num_cpu=None, make_default=False, graph=None):
         return tf.InteractiveSession(config=tf_config, graph=graph)
     else:
         return tf.Session(config=tf_config, graph=graph)
+        # return tf_debug.LocalCLIDebugWrapperSession(tf.Session(config=tf_config, graph=graph))
 
 def single_threaded_session():
     """Returns a session which will only use a single CPU"""

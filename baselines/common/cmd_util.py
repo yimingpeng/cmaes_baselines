@@ -31,6 +31,22 @@ def make_atari_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
     set_global_seeds(seed)
     return SubprocVecEnv([make_env(i + start_index) for i in range(num_env)])
 
+def make_gym_control_multi_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
+    """
+    Added by Yiming (29/5/2018)
+    Create a wrapped, monitored gym.Env for Simple Control Problems.
+    """
+    if wrapper_kwargs is None: wrapper_kwargs = {}
+    def make_env(rank): # pylint: disable=C0111
+        def _thunk():
+            env = gym.make(env_id)
+            env.seed(seed + rank)
+            env = Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)), allow_early_resets=True)
+            return env
+        return _thunk
+    set_global_seeds(seed)
+    return SubprocVecEnv([make_env(i + start_index) for i in range(num_env)])
+
 def make_mujoco_env(env_id, seed):
     """
     Create a wrapped, monitored gym.Env for MuJoCo.
@@ -61,7 +77,7 @@ def make_gym_control_env(env_id, seed):
     """
     set_global_seeds(seed)
     env = gym.make(env_id)
-    # env = Monitor(env, logger.get_dir(), allow_early_resets=True)
+    env = Monitor(env, logger.get_dir(), allow_early_resets=True)
     env.seed(seed)
     return env
 
@@ -125,9 +141,9 @@ def gym_ctrl_arg_parser():
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="LunarLander-v2")
     parser.add_argument('--env', help='environment ID', type=str,
-                        default="CartPole-v0")
-    parser.add_argument('--seed', help='RNG seed', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(1e8))
+                        default="LunarLanderContinuous-v2")
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--num-timesteps', type=int, default=int(5e7))
     return parser
 
 
@@ -137,10 +153,12 @@ def pybullet_arg_parser():
     Create an argparse.ArgumentParser for run_pybullet.py.
     """
     parser = arg_parser()
-    # parser.add_argument('--env', help='environment ID', type=str,
-    #                     default="InvertedDoublePendulumBulletEnv-v0")
     parser.add_argument('--env', help='environment ID', type=str,
-                        default="InvertedPendulumBulletEnv-v0")
-    parser.add_argument('--seed', help='RNG seed', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(1e8))
+                        default="AntBulletEnv-v0")
+    # parser.add_argument('--env', help='environment ID', type=str,
+    #                     default="HopperBulletEnv-v0")
+    # parser.add_argument('--env', help='environment ID', type=str,
+    #                     default="HumanoidBulletEnv-v0")
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--num-timesteps', type=int, default=int(5e7))
     return parser
