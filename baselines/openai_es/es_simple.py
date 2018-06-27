@@ -47,6 +47,8 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -82,7 +84,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     ep_num = 0
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(seg_gen)
+            result_record()
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -105,6 +107,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -120,16 +124,11 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
             ob = env.reset()
         t += 1
 
-
-def result_record(seg_gen):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
-        episodes_so_far, tstart
-    eval_seg = seg_gen.__next__()
-    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
+        episodes_so_far, tstart,best_fitness
+    if best_fitness != -np.inf:
+        rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -149,7 +148,6 @@ def result_record(seg_gen):
 
 
 def learn(base_env,
-          test_env,
           policy_fn, *,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
@@ -198,9 +196,8 @@ def learn(base_env,
 
     # Build generator for all solutions
     global seg_gen
-    seg_gen = traj_segment_generator_eval(backup_pi, test_env, timesteps_per_actorbatch, stochastic=True)
+    seg_gen = traj_segment_generator_eval(backup_pi, base_env, timesteps_per_actorbatch, stochastic=True)
     actors = []
-    best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, base_env,
                                           timesteps_per_actorbatch,
@@ -213,6 +210,10 @@ def learn(base_env,
     pop = {}
     pop["fitness"] = np.empty([popsize, 1], dtype = np.float)
     gen_counter = 0
+
+    best_fitness = -np.inf
+    best_solution = flatten_weights
+    best_noise = None
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -233,15 +234,14 @@ def learn(base_env,
         assign_backup_eq_new() # backup current policy
 
         logger.log("********** Generation %i ************" % iters_so_far)
-        if iters_so_far == 0: # First test result at the beginning of training
-            eval_seg = seg_gen.__next__()
-            lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-            listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-            lens, rews = map(flatten_lists, zip(*listoflrpairs))
-            lenbuffer.extend(lens)
-            rewbuffer.extend(rews)
+        eval_seg = seg_gen.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
+        if iters_so_far == 0:
+            result_record()
 
         ob_segs = None
+        segs = []
         # generate solutions
         pop["solutions"] = flatten_weights * np.ones((popsize,1))
         pop["noises"] = np.random.randn(popsize, indv_len)
@@ -250,24 +250,59 @@ def learn(base_env,
             pi_set_from_flat_params(pop["solutions"][i])
             seg = actors[i].__next__()
             pop["fitness"][i] = np.mean(seg["ep_rets"])
+            segs.append(seg)
             if ob_segs is None:
                 ob_segs = {'ob': np.copy(seg['ob'])}
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
             assign_new_eq_backup()
+        # pop["fitness"], real_costs = compute_centered_ranks(pop["fitness"])
+        l2_decay = compute_weight_decay(0.01, pop["solutions"])
+        pop["fitness"] += l2_decay.reshape(pop["fitness"].shape)
+        fit_idx = pop["fitness"].flatten().argsort()[::-1][0]
+
 
         pop["fitness"], real_costs = fitness_normalization(pop["fitness"])
-        flatten_weights = flatten_weights + alpha/sigma * np.mean(pop["fitness"].reshape(32, 1) * pop["noises"], axis = 0)
+        best_fitness = real_costs[fit_idx]
+        optimizer = Adam(theta = flatten_weights, stepsize = alpha)
+
+        gradient = 1/sigma * np.mean(pop["fitness"].reshape(pop["fitness"].shape[0], 1) * pop["noises"], axis = 0)
+        flatten_weights = optimizer.update(-gradient)
+
         logger.log("Generation:", gen_counter)
-        logger.log("Best Solution Fitness:", real_costs[pop["fitness"].flatten().argsort()[::-1][0]])
+        logger.log("Best Solution Fitness:", best_fitness)
         pi_set_from_flat_params(flatten_weights)
+
+        if sigma >= 0.01:
+            sigma *= 0.999
+        if alpha > 0.001:
+            alpha *= 0.9999
 
         ob = ob_segs["ob"]
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
 
         gen_counter += 1
         iters_so_far += 1
-        episodes_so_far += sum(lens)
+
+def compute_centered_ranks(x):
+  """
+  https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py
+  """
+  y = compute_ranks(x.ravel()).reshape(x.shape).astype(np.float32)
+  y /= (x.size - 1)
+  y -= .5
+  return y, x
+
+def compute_ranks(x):
+  """
+  Returns ranks in [0, len(x))
+  Note: This is different from scipy.stats.rankdata, which returns ranks in [1, len(x)].
+  (https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py)
+  """
+  assert x.ndim == 1
+  ranks = np.empty(len(x), dtype=int)
+  ranks[x.argsort()] = np.arange(len(x))
+  return ranks
 
 
 def compute_weight_decay(weight_decay, model_param_list):
@@ -284,3 +319,37 @@ def fitness_normalization(x):
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
+
+
+class Optimizer(object):
+  def __init__(self, theta, epsilon=1e-08):
+    self.theta = theta
+    self.epsilon = epsilon
+    self.dim = len(theta)
+    self.t = 0
+
+  def update(self, globalg):
+    self.t += 1
+    step = self._compute_step(globalg)
+    self.theta += step
+    return self.theta
+
+  def _compute_step(self, globalg):
+    raise NotImplementedError
+
+
+class Adam(Optimizer):
+  def __init__(self, theta, stepsize, beta1=0.99, beta2=0.999):
+    Optimizer.__init__(self, theta)
+    self.stepsize = stepsize
+    self.beta1 = beta1
+    self.beta2 = beta2
+    self.m = np.zeros(self.dim, dtype=np.float32)
+    self.v = np.zeros(self.dim, dtype=np.float32)
+
+  def _compute_step(self, globalg):
+    a = self.stepsize * np.sqrt(1 - self.beta2 ** self.t) / (1 - self.beta1 ** self.t)
+    self.m = self.beta1 * self.m + (1 - self.beta1) * globalg
+    self.v = self.beta2 * self.v + (1 - self.beta2) * (globalg * globalg)
+    step = -a * self.m / (np.sqrt(self.v) + self.epsilon)
+    return step
