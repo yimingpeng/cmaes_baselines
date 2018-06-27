@@ -1,3 +1,6 @@
+import time
+from collections import deque
+
 import numpy as np
 import tensorflow as tf
 from baselines import logger
@@ -13,6 +16,7 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
     """
     Simulate the env and policy for max_pathlength steps
     """
+    global timesteps_so_far
     ob = env.reset()
     prev_ob = np.float32(np.zeros(ob.shape))
     if obfilter: ob = obfilter(ob)
@@ -24,6 +28,8 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
     logps = []
     rewards = []
     for _ in range(max_pathlength):
+        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
+            result_record()
         if animate:
             env.render()
         state = np.concatenate([ob, prev_ob], -1)
@@ -38,6 +44,7 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
         ob, rew, done, _ = env.step(scaled_ac)
         if obfilter: ob = obfilter(ob)
         rewards.append(rew)
+        timesteps_so_far += 1
         if done:
             terminated = True
             break
@@ -65,6 +72,10 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
     do_update = U.function(inputs, update_op)
     U.initialize()
 
+    global i, timesteps_so_far, start_time, paths, lenbuffer, rewbuffer
+
+    lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
+    rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
     # start queue runners
     enqueue_threads = []
     coord = tf.train.Coordinator()
@@ -74,6 +85,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
 
     i = 0
     timesteps_so_far = 0
+    start_time = 0
     while True:
         if timesteps_so_far > num_timesteps:
             break
@@ -87,7 +99,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
             paths.append(path)
             n = pathlength(path)
             timesteps_this_batch += n
-            timesteps_so_far += n
+            # timesteps_so_far += n
             if timesteps_this_batch > timesteps_per_batch:
                 break
 
@@ -129,14 +141,36 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         else:
             logger.log("kl just right!")
 
-        logger.record_tabular("EpRewMean", np.mean([path["reward"].sum() for path in paths]))
-        logger.record_tabular("EpRewSEM", np.std([path["reward"].sum()/np.sqrt(len(paths)) for path in paths]))
-        logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
-        logger.record_tabular("KL", kl)
+        rewbuffer.extend([path["reward"].sum() for path in paths])
+        lenbuffer.extend([pathlength(path) for path in paths])
+        # logger.record_tabular("EpRewMean", np.mean([path["reward"].sum() for path in paths]))
+        # logger.record_tabular("EpRewSEM", np.std([path["reward"].sum()/np.sqrt(len(paths)) for path in paths]))
+        # logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
+        # logger.record_tabular("KL", kl)
         if callback:
             callback()
-        logger.dump_tabular()
+        # logger.dump_tabular()
         i += 1
 
     coord.request_stop()
     coord.join(enqueue_threads)
+
+def result_record():
+    global rewbuffer, lenbuffer, i, start_time, timesteps_so_far
+    if len(rewbuffer) == 0:
+        # TODO: Add pong game checking
+        mean_rewbuffer = 0
+    else:
+        mean_rewbuffer = np.mean(rewbuffer)
+    if len(lenbuffer) == 0:
+        # TODO: Add pong game checking
+        mean_lenbuffer = 0
+    else:
+        mean_lenbuffer = np.mean(lenbuffer)
+    logger.record_tabular("EpRewMean", mean_rewbuffer)
+    logger.record_tabular("EpLenMean", mean_lenbuffer)
+    logger.record_tabular("IterationsSoFar", i)
+    logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+    logger.record_tabular("TimeElapsed", time.time() - start_time)
+    # if MPI.COMM_WORLD.Get_rank() == 0:
+    logger.dump_tabular()

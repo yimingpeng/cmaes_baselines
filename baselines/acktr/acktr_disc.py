@@ -144,7 +144,7 @@ def learn(policy, env, seed, total_timesteps=int(40e6), gamma=0.99, log_interval
             logger.record_tabular("policy_loss", float(policy_loss))
             logger.record_tabular("value_loss", float(value_loss))
             logger.record_tabular("explained_variance", float(ev))
-            logger.dump_tabular()
+            # logger.dump_tabular()
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir():
             savepath = osp.join(logger.get_dir(), 'checkpoint%.5i'%update)
