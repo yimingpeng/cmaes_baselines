@@ -7,18 +7,18 @@ import numpy as np
 from baselines import logger
 from mpi4py import MPI
 import tensorflow as tf
-from baselines.common import zipsame
+from baselines.common import zipsame, set_global_seeds
 
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
-    ac = env.action_space.sample() # not used, just so we have the datatype
-    new = True # marks if we're on first timestep of an episode
+    ac = env.action_space.sample()  # not used, just so we have the datatype
+    new = True  # marks if we're on first timestep of an episode
     ob = env.reset()
 
-    cur_ep_ret = 0 # return in current episode
-    cur_ep_len = 0 # len of current episode
-    ep_rets = [] # returns of completed episodes in this segment
-    ep_lens = [] # lengths of ...
+    cur_ep_ret = 0  # return in current episode
+    cur_ep_len = 0  # len of current episode
+    ep_rets = []  # returns of completed episodes in this segment
+    ep_lens = []  # lengths of ...
 
     # Initialize history arrays
     obs = np.array([ob for _ in range(horizon)])
@@ -34,9 +34,9 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            yield {"ob" : obs, "rew" : rews, "new" : news,
-                    "ac" : acs, "prevac" : prevacs,
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens}
+            yield {"ob": obs, "rew": rews, "new": news,
+                   "ac": acs, "prevac": prevacs,
+                   "ep_rets": ep_rets, "ep_lens": ep_lens}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
@@ -47,6 +47,8 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -60,8 +62,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ob = env.reset()
         t += 1
 
-
-def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
     global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -82,7 +83,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     ep_num = 0
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(seg_gen)
+            result_record()
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -105,6 +106,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -121,15 +124,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         t += 1
 
 
-def result_record(seg_gen):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart
-    eval_seg = seg_gen.__next__()
-    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -149,7 +146,6 @@ def result_record(seg_gen):
 
 
 def learn(base_env,
-          test_env,
           policy_fn, *,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
@@ -164,6 +160,7 @@ def learn(base_env,
           max_seconds = 0,
           seed = 0
           ):
+    set_global_seeds(seed)
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = base_env.observation_space
@@ -176,7 +173,7 @@ def learn(base_env,
     pi_get_flat_params = U.GetFlat(pi.get_trainable_variables())
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
-        tstart, lenbuffer, rewbuffer,best_fitness
+        tstart, lenbuffer, rewbuffer,best_fitness, eval_seq
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
@@ -197,15 +194,17 @@ def learn(base_env,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
-    global seg_gen
-    seg_gen = traj_segment_generator_eval(backup_pi, test_env, timesteps_per_actorbatch, stochastic=True)
     actors = []
-    best_fitness = 0
+    best_fitness = -np.inf
+
+    eval_seq = traj_segment_generator_eval(pi, base_env,
+                                          timesteps_per_actorbatch,
+                                          stochastic = True)
     for i in range(popsize):
         newActor = traj_segment_generator(pi, base_env,
                                           timesteps_per_actorbatch,
                                           stochastic = True,
-                                          eval_iters = eval_iters, seg_gen=seg_gen)
+                                          eval_iters = eval_iters)
         actors.append(newActor)
 
     flatten_weights = pi_get_flat_params()
@@ -216,7 +215,7 @@ def learn(base_env,
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
     opt['seed'] = seed
-    opt['AdaptSigma'] = False
+    opt['AdaptSigma'] = True
     # opt['bounds'] = bounds
     es = cma.CMAEvolutionStrategy(flatten_weights,
                                   sigma, opt)
@@ -242,13 +241,11 @@ def learn(base_env,
         assign_backup_eq_new() # backup current policy
 
         logger.log("********** Generation %i ************" % iters_so_far)
-        if iters_so_far == 0: # First test result at the beginning of training
-            eval_seg = seg_gen.__next__()
-            lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-            listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-            lens, rews = map(flatten_lists, zip(*listoflrpairs))
-            lenbuffer.extend(lens)
-            rewbuffer.extend(rews)
+        eval_seg = eval_seq.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
+        if iters_so_far == 0:
+            result_record()
 
         solutions = es.ask()
         if costs is not None:
@@ -269,10 +266,20 @@ def learn(base_env,
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
             assign_new_eq_backup()
+        fit_idx = np.array(costs).flatten().argsort()[:len(costs)]
+        solutions = np.array(solutions)[fit_idx]
+        costs = np.array(costs)[fit_idx]
+        segs = np.array(segs)[fit_idx]
         # Weights decay
-        l2_decay = compute_weight_decay(0.999, solutions)
+        # costs, real_costs = fitness_shift(costs)
+        # costs, real_costs = compute_centered_ranks(costs)
+        l2_decay = compute_weight_decay(0.01, solutions)
         costs += l2_decay
         costs, real_costs = fitness_normalization(costs)
+        # best_solution = np.copy(solutions[0])
+        # best_fitness = -real_costs[0]
+        # rewbuffer.extend(segs[0]["ep_rets"])
+        # lenbuffer.extend(segs[0]["ep_lens"])
         es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
         best_solution = np.copy(es.result[0])
         best_fitness = -es.result[1]
@@ -286,6 +293,13 @@ def learn(base_env,
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
+def fitness_shift(x):
+    x = np.asarray(x).flatten()
+    ranks = np.empty(len(x))
+    ranks[x.argsort()] = np.arange(len(x))
+    ranks /= (len(x) - 1)
+    ranks -= .5
+    return ranks,x
 
 def compute_weight_decay(weight_decay, model_param_list):
     model_param_grid = np.array(model_param_list)
@@ -298,6 +312,25 @@ def fitness_normalization(x):
     std = np.std(x)
     return (x - mean) / std, x
 
+def compute_centered_ranks(x):
+  """
+  https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py
+  """
+  y = compute_ranks(x.ravel()).reshape(x.shape).astype(np.float32)
+  y /= (x.size - 1)
+  y -= .5
+  return y, x
+
+def compute_ranks(x):
+  """
+  Returns ranks in [0, len(x))
+  Note: This is different from scipy.stats.rankdata, which returns ranks in [1, len(x)].
+  (https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py)
+  """
+  assert x.ndim == 1
+  ranks = np.empty(len(x), dtype=int)
+  ranks[x.argsort()] = np.arange(len(x))
+  return ranks
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
