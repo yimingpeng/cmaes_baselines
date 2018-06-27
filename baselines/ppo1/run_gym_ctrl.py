@@ -19,16 +19,14 @@ def train(env_id, num_timesteps, seed):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
             hid_size=64, num_hid_layers=2)
     env = make_gym_control_env(env_id, seed)
-    test_env = make_gym_control_env(env_id, seed)
-    pposgd_simple.learn(env, test_env, policy_fn,
+    pposgd_simple.learn(env, policy_fn,
             max_timesteps=num_timesteps,
             timesteps_per_actorbatch=2048,
             clip_param=0.2, entcoeff=0.0,
-            optim_epochs=10, optim_stepsize=3e-4, optim_batchsize=128,
+            optim_epochs=10, optim_stepsize=3e-4, optim_batchsize=64,
             gamma=0.99, lam=0.95, schedule='linear'
         )
     env.close()
-    test_env.close()
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
