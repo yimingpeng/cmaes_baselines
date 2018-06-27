@@ -36,6 +36,7 @@ def train(env_id, num_timesteps, seed):
 
     base_env = make_pybullet_env(env_id, seed)
     test_env = make_pybullet_env(env_id, seed)
+    # test_env.render(mode = "human")
     es_simple.learn(base_env,
                        test_env,
                        policy_fn,
