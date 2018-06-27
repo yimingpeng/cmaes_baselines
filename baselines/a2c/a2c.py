@@ -22,13 +22,15 @@ class Model(object):
         sess = tf_util.make_session()
         nbatch = nenvs*nsteps
 
-        A = tf.placeholder(tf.int32, [nbatch])
+        # A = tf.placeholder(dtype=tf.int32, shape=[nbatch]+[ac_space.shape[0]])
+        # A = tf.placeholder(tf.int32, [nbatch])
         ADV = tf.placeholder(tf.float32, [nbatch])
         R = tf.placeholder(tf.float32, [nbatch])
         LR = tf.placeholder(tf.float32, [])
 
         step_model = policy(sess, ob_space, ac_space, nenvs, 1, reuse=False)
         train_model = policy(sess, ob_space, ac_space, nenvs*nsteps, nsteps, reuse=True)
+        A = train_model.pdtype.sample_placeholder([None])
 
         neglogpac = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=train_model.pi, labels=A)
         pg_loss = tf.reduce_mean(ADV * neglogpac)
@@ -84,9 +86,10 @@ class Model(object):
 
 class Runner(AbstractEnvRunner):
 
-    def __init__(self, env, model, nsteps=5, gamma=0.99):
+    def __init__(self, env, model, nsteps=5, gamma=0.99, env_name = None):
         super().__init__(env=env, model=model, nsteps=nsteps)
         self.gamma = gamma
+        self.env_name = env_name
 
     def run(self):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [],[],[],[],[]
@@ -97,6 +100,8 @@ class Runner(AbstractEnvRunner):
             mb_actions.append(actions)
             mb_values.append(values)
             mb_dones.append(self.dones)
+            if self.env_name == "LunarLanderContinuous-v2":
+                actions = np.clip(actions, -1.0, 1.0)
             obs, rewards, dones, _ = self.env.step(actions)
             self.states = states
             self.dones = dones
@@ -130,7 +135,7 @@ class Runner(AbstractEnvRunner):
         mb_masks = mb_masks.flatten()
         return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values
 
-def learn(policy, env, seed, nsteps=5, total_timesteps=int(80e6), vf_coef=0.5, ent_coef=0.01, max_grad_norm=0.5, lr=7e-4, lrschedule='linear', epsilon=1e-5, alpha=0.99, gamma=0.99, log_interval=100):
+def learn(policy, env, seed, nsteps=5, total_timesteps=int(80e6), vf_coef=0.5, ent_coef=0.01, max_grad_norm=0.5, lr=7e-4, lrschedule='linear', epsilon=1e-5, alpha=0.99, gamma=0.99, log_interval=100, env_name = None):
     set_global_seeds(seed)
 
     nenvs = env.num_envs
@@ -138,7 +143,7 @@ def learn(policy, env, seed, nsteps=5, total_timesteps=int(80e6), vf_coef=0.5, e
     ac_space = env.action_space
     model = Model(policy=policy, ob_space=ob_space, ac_space=ac_space, nenvs=nenvs, nsteps=nsteps, ent_coef=ent_coef, vf_coef=vf_coef,
         max_grad_norm=max_grad_norm, lr=lr, alpha=alpha, epsilon=epsilon, total_timesteps=total_timesteps, lrschedule=lrschedule)
-    runner = Runner(env, model, nsteps=nsteps, gamma=gamma)
+    runner = Runner(env, model, nsteps=nsteps, gamma=gamma, env_name=env_name)
 
     nbatch = nenvs*nsteps
     tstart = time.time()
