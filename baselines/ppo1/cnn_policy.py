@@ -5,7 +5,7 @@ from baselines.common.distributions import make_pdtype
 
 class CnnPolicy(object):
     recurrent = False
-    def __init__(self, name, ob_space, ac_space, kind='large'):
+    def __init__(self, name, ob_space, ac_space, kind='small'):
         with tf.variable_scope(name):
             self._init(ob_space, ac_space, kind)
             self.scope = tf.get_variable_scope().name

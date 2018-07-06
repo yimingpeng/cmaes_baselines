@@ -48,6 +48,8 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -83,7 +85,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     ep_num = 0
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(seg_gen)
+            result_record()
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -106,6 +108,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         acs[i] = ac
         prevacs[i] = prevac
 
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -122,15 +126,11 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         t += 1
 
 
-def result_record(seg_gen):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
-        episodes_so_far, tstart
-    eval_seg = seg_gen.__next__()
-    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
+        episodes_so_far, tstart,best_fitness
+    if best_fitness != -np.inf:
+        rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -150,7 +150,6 @@ def result_record(seg_gen):
 
 
 def learn(base_env,
-          test_env,
           policy_fn, *,
           max_fitness,  # has to be negative, as cmaes consider minization
           popsize,
@@ -212,9 +211,14 @@ def learn(base_env,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
-    global seg_gen
-    seg_gen = traj_segment_generator_eval(backup_pi, test_env, timesteps_per_actorbatch, stochastic = True)
+    seg_gen = traj_segment_generator_eval(backup_pi, base_env, timesteps_per_actorbatch, stochastic = True)
     actors = []
+    for i in range(popsize):
+        newActor = traj_segment_generator(pi, base_env,
+                                          timesteps_per_actorbatch,
+                                          stochastic = True,
+                                          eval_iters = eval_iters, seg_gen = seg_gen)
+        actors.append(newActor)
     best_fitness = -np.inf
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -235,13 +239,12 @@ def learn(base_env,
         sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
 
         logger.log("********** Iteration %i ************" % iters_so_far)
-        if iters_so_far == 0:  # First test result at the beginning of training
-            eval_seg = seg_gen.__next__()
-            lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-            listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-            lens, rews = map(flatten_lists, zip(*listoflrpairs))
-            lenbuffer.extend(lens)
-            rewbuffer.extend(rews)
+        eval_seg = seg_gen.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
+        if iters_so_far == 0:
+            result_record()
+
         for i in range(len(layer_var_list)):
             assign_backup_eq_new()  # backup current policy
             logger.log("Current Layer:"+ str(layer_var_list[i]))
@@ -253,7 +256,7 @@ def learn(base_env,
             opt['verb_disp'] = 0
             opt['verb_log'] = 0
             opt['seed'] = seed
-            opt['AdaptSigma'] = False
+            opt['AdaptSigma'] = True
             # opt['bounds'] = bounds
             es = cma.CMAEvolutionStrategy(flatten_weights,
                                           sigma_adapted, opt)
@@ -282,13 +285,15 @@ def learn(base_env,
                         ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis = 0)
                     assign_new_eq_backup()
                 # Weights decay
-                l2_decay = compute_weight_decay(0.999, solutions)
+                l2_decay = compute_weight_decay(0.01, solutions)
                 costs += l2_decay
                 costs, real_costs = fitness_normalization(costs)
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
                 if -es.result[1] > best_fitness:
                     best_solution = np.copy(es.result[0])
                     best_fitness = -es.result[1]
+                    rewbuffer.extend(es.result[3]["ep_rets"])
+                    lenbuffer.extend(es.result[3]["ep_lens"])
                     layer_set_operate_list[i](best_solution)
                     logger.log("Update the layer")
                 else:

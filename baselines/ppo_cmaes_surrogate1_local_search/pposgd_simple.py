@@ -397,6 +397,9 @@ def learn(env, test_env, policy_fn, *,
         # Local search for policy (gradient)
         logger.log("Optimizing Policy...")
         logger.log(fmt_row(13, loss_names))
+
+        # Local Search
+
         # Here we do a bunch of optimization epochs over the data
         for _ in range(optim_epochs):
             losses = [] # list of tuples, each of which gives the loss for a minibatch

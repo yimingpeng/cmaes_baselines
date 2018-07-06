@@ -16,7 +16,7 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -10000
-    popsize = 5
+    popsize = 32
     gensize = 10 # gen size for each iteration
     bounds = [-5.0, 5.0]
     sigma = 0.1
@@ -30,9 +30,7 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     base_env = make_gym_control_env(env_id, seed)
-    test_env = make_gym_control_env(env_id, seed)
     cmaes_simple.learn(base_env,
-                       test_env,
                        policy_fn,
                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                        popsize = popsize,
@@ -44,7 +42,6 @@ def train(env_id, num_timesteps, seed):
                        timesteps_per_actorbatch=2048,
                        seed=seed)
     base_env.close()
-    test_env.close()
 
 
 def main():
