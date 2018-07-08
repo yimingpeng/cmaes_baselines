@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Add the current folder to PYTHONPATH by Yiming
 import os
 import sys
 

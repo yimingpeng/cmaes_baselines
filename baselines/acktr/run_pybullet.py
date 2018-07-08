@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Add the current folder to PYTHONPATH by Yiming
 import os
 import sys
 
@@ -18,8 +17,6 @@ from baselines.common.cmd_util import make_mujoco_env, mujoco_arg_parser
 from baselines.acktr.acktr_cont import learn
 from baselines.acktr.policies import GaussianMlpPolicy
 from baselines.acktr.value_functions import NeuralNetValueFunction
-
-
 
 def train(env_id, num_timesteps, seed):
     env = make_pybullet_env(env_id, seed)
