@@ -3,6 +3,10 @@
 # the repository
 cd /vol/grid-solar/sgeusers/yimingpeng/cmaes_baselines/grid_scripts/DDPG/
 
+# clone the repository
+# git clone https://yimingpeng:Aa19820713@github.com/yimingpeng/cmaes_baselines &
+# cd ./cmaes_baselines/grid_scripts/DDPG/
+
 # setting the grid env
 need sgegrid
 qsub -t 1-5:1 DDPG_HalfCheetah.sh

@@ -34,6 +34,9 @@ for algorithm in algorithms:
         f1 = open(directory + "/" + algorithm + "_" +
                   problem + ".sh", 'w')
         for line in f:
+            if 'pyName="run_pybullet.py"' in line:
+                if algorithm == "DDPG":
+                    line = line.replace("run_pybullet.py", "main.py")
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
@@ -59,7 +62,10 @@ for algorithm in algorithms:
                   problem + ".sh", 'w')
         for line in f:
             if 'pyName="run_pybullet.py"' in line:
-                line = 'pyName="run_gym_ctrl.py"'
+                if algorithm == "DDPG":
+                    line = line.replace("run_pybullet.py", "main.py")
+                else:
+                    line = 'pyName="run_gym_ctrl.py"'
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:

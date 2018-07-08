@@ -79,7 +79,7 @@ source activate cmaes_baselines
 #Define path
 experimentFolder="cmaes_baselines"
 experimentName="baselines"
-pyName="run_pybullet.py"
+pyName="main.py"
 
 #
 # Copy the input file to the local directory

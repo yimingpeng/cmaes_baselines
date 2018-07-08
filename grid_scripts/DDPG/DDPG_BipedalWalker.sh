@@ -79,7 +79,8 @@ source activate cmaes_baselines
 #Define path
 experimentFolder="cmaes_baselines"
 experimentName="baselines"
-pyName="run_gym_ctrl.py"
+pyName="main.py"
+
 #
 # Copy the input file to the local directory
 #
