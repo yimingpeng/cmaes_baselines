@@ -96,7 +96,7 @@ cd $experimentFolder/$experimentName/trpo/
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env InvertedPendulumSwingupBulletEnv-v0--seed $SGE_TASK_ID
+python $pyName --env InvertedPendulumSwingupBulletEnv-v0 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la

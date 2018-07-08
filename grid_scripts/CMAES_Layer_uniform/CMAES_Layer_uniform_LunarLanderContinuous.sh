@@ -95,7 +95,7 @@ cd $experimentFolder/$experimentName/cmaes_layer_uniform/
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env LunarLanderContinuous-v2--seed $SGE_TASK_ID
+python $pyName --env LunarLanderContinuous-v2 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la

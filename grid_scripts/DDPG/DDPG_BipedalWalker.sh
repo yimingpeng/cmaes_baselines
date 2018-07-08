@@ -95,7 +95,7 @@ cd $experimentFolder/$experimentName/ddpg/
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env BipedalWalker-v2--seed $SGE_TASK_ID
+python $pyName --env BipedalWalker-v2 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la

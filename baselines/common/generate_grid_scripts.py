@@ -37,7 +37,7 @@ for algorithm in algorithms:
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
-                line = "python $pyName --env " + problem + "BulletEnv-v0" + "--seed $SGE_TASK_ID\n"
+                line = "python $pyName --env " + problem + "BulletEnv-v0" + " --seed $SGE_TASK_ID\n"
             f1.write(line)
         f1.close()
         f.seek(0)
@@ -63,7 +63,7 @@ for algorithm in algorithms:
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
-                line = "python $pyName --env " + problem + "-v2" + "--seed $SGE_TASK_ID\n"
+                line = "python $pyName --env " + problem + "-v2" + " --seed $SGE_TASK_ID\n"
             f1.write(line)
         f1.close()
         f.seek(0)
