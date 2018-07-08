@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+
+"""Description:
+"""
+__author__ = "Yiming Peng"
+__copyright__ = "Copyright 2018, baselines"
+__credits__ = ["Yiming Peng"]
+__license__ = "GPL"
+__version__ = "1.0"
+__maintainer__ = "Yiming Peng"
+__email__ = "yiming.peng@ecs.vuw.ac.nz"
+__status__ = "Prototype"
+
+# Scripts for generating GCP startup scripts
+import os
+
+f = open("../../grid_scripts/template.sh")
+f2 = open("../../grid_scripts/run_grid_ex_template.sh")
+algorithms = ["PPO", "CMAES", "CMAES_Layer_Entire",
+              "CMAES_Layer_uniform", "DDPG",
+              "ACKTR", "openai_es", "uber_ga",
+              "TRPO"]
+bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
+                   "InvertedPendulum", "InvertedPendulumSwingup", "Reacher",
+                   "Walker2D"]
+gym_problems = ["LunarLanderContinuous", "BipedalWalker", "BipedalWalkerHardcore"]
+seeds = range(5)
+# Generate for Bullet problems
+for algorithm in algorithms:
+    for problem in bullet_problems:
+        directory = "../../grid_scripts/" + str(algorithm)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        f1 = open(directory + "/" + algorithm + "_" +
+                  problem + ".sh", 'w')
+        for line in f:
+            if "$experimentFolder/$experimentName/ppo1/" in line:
+                line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
+            if "BipedalWalker-v2" in line:
+                line = "python $pyName --env " + problem + "BulletEnv-v0" + "--seed $SGE_TASK_ID\n"
+            f1.write(line)
+        f1.close()
+        f.seek(0)
+    f3 = open(directory + "/run_grid_ex_" + algorithm + ".sh", 'w')
+    for line in f2:
+        if "ACKTR" in line:
+            line = line.replace("ACKTR", algorithm)
+        f3.write(line)
+    f3.close()
+    f2.seek(0)
+
+# Generate for gym control problems
+for algorithm in algorithms:
+    for problem in gym_problems:
+        directory = "../../grid_scripts/" + str(algorithm)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        f1 = open(directory + "/" + algorithm + "_" +
+                  problem + ".sh", 'w')
+        for line in f:
+            if 'pyName="run_pybullet.py"' in line:
+                line = 'pyName="run_gym_ctrl.py"'
+            if "$experimentFolder/$experimentName/ppo1/" in line:
+                line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
+            if "BipedalWalker-v2" in line:
+                line = "python $pyName --env " + problem + "-v2" + "--seed $SGE_TASK_ID\n"
+            f1.write(line)
+        f1.close()
+        f.seek(0)
+
+    f3 = open(directory + "/run_grid_ex_" + algorithm + ".sh", 'w')
+    for line in f2:
+        if "ACKTR" in line:
+            line = line.replace("ACKTR", algorithm)
+        f3.write(line)
+    f3.close()
+    f2.seek(0)
+f.close()
