@@ -34,13 +34,18 @@ for algorithm in algorithms:
         f1 = open(directory + "/" + algorithm + "_" +
                   problem + ".sh", 'w')
         for line in f:
+            if 'source activate cmaes_baselines' in line and algorithm == "DDPG":
+                    line = line.replace("cmaes_baselines", "ddpg_baselines")
             if 'pyName="run_pybullet.py"' in line:
                 if algorithm == "DDPG":
                     line = line.replace("run_pybullet.py", "main.py")
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
-                line = "python $pyName --env " + problem + "BulletEnv-v0" + " --seed $SGE_TASK_ID\n"
+                if algorithm == "DDPG":
+                    line = "python $pyName --env-id " + problem + "BulletEnv-v0" + " --seed $SGE_TASK_ID\n"
+                else:
+                    line = "python $pyName --env " + problem + "BulletEnv-v0" + " --seed $SGE_TASK_ID\n"
             f1.write(line)
         f1.close()
         f.seek(0)
@@ -69,7 +74,10 @@ for algorithm in algorithms:
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
-                line = "python $pyName --env " + problem + "-v2" + " --seed $SGE_TASK_ID\n"
+                if algorithm == "DDPG":
+                    line = "python $pyName --env-id " + problem + "-v2" + " --seed $SGE_TASK_ID\n"
+                else:
+                    line = "python $pyName --env " + problem + "-v2" + " --seed $SGE_TASK_ID\n"
             f1.write(line)
         f1.close()
         f.seek(0)

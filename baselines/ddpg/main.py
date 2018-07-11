@@ -99,7 +99,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # parser.add_argument('--env-id', type=str, default='InvertedPendulumBulletEnv-v0')
-    parser.add_argument('--env', type=str, default='LunarLanderContinuous-v2')
+    parser.add_argument('--env-id', type=str, default='LunarLanderContinuous-v2')
     boolean_flag(parser, 'render-eval', default=False)
     boolean_flag(parser, 'layer-norm', default=True)
     boolean_flag(parser, 'render', default=False)

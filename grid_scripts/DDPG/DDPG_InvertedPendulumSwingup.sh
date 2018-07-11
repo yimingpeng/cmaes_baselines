@@ -74,7 +74,7 @@ ls -la
 echo ==SETUP BASH==
 bash
 export PATH=/vol/grid-solar/sgeusers/yimingpeng/miniconda3/bin/:$PATH
-source activate cmaes_baselines
+source activate ddpg_baselines
 
 #Define path
 experimentFolder="cmaes_baselines"
@@ -96,7 +96,7 @@ cd $experimentFolder/$experimentName/ddpg/
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env InvertedPendulumSwingupBulletEnv-v0 --seed $SGE_TASK_ID
+python $pyName --env-id InvertedPendulumSwingupBulletEnv-v0 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la
