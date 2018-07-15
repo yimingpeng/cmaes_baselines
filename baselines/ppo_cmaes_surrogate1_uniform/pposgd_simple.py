@@ -167,6 +167,15 @@ def add_vtarg_and_adv(seg, gamma, lam):
         gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
     seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
+def uniform_select(weights, proportion):
+    num_of_weights = int(proportion * len(weights))
+    assert num_of_weights != 0  # make sure there are something to be selected
+    length = len(weights) if len(weights) < num_of_weights else \
+        num_of_weights
+    index = np.random.choice(range(len(
+        weights)), length, replace = False)
+    return index, np.take(weights, index)
+
 
 def learn(env, test_env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
@@ -335,6 +344,8 @@ def learn(env, test_env, policy_fn, *,
         else:
             raise NotImplementedError
 
+        epsilon = max(0.1 - float(timesteps_so_far) / max_timesteps, 0)
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
         logger.log("********** Iteration %i ************" % iters_so_far)
 
         # Generate new samples
@@ -393,6 +404,7 @@ def learn(env, test_env, policy_fn, *,
                     init_weights = np.take(flatten_weights, selected_index)
             es = cma.CMAEvolutionStrategy(flatten_weights,
                                           sigma, opt)
+            die_out_count = 0
             while True:
                 if es.countiter >= gensize:
                     logger.log("Max generations for current layer")

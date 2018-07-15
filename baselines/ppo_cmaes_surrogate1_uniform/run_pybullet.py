@@ -22,7 +22,7 @@ def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
     gensize = 20 # For each iteration
-    max_v_train_iter = 2
+    max_v_train_iter = 10
     bounds = [-5.0, 5.0]
     sigma = 0.01
     eval_iters = 0.1
