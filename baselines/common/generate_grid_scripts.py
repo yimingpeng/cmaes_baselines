@@ -34,8 +34,8 @@ for algorithm in algorithms:
         f1 = open(directory + "/" + algorithm + "_" +
                   problem + ".sh", 'w')
         for line in f:
-            if 'source activate cmaes_baselines' in line and algorithm == "DDPG":
-                    line = line.replace("cmaes_baselines", "ddpg_baselines")
+            # if 'source activate cmaes_baselines' in line and algorithm == "DDPG":
+            #         line = line.replace("cmaes_baselines", "ddpg_baselines")
             if 'pyName="run_pybullet.py"' in line:
                 if algorithm == "DDPG":
                     line = line.replace("run_pybullet.py", "main.py")

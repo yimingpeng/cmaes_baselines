@@ -74,7 +74,7 @@ ls -la
 echo ==SETUP BASH==
 bash
 export PATH=/vol/grid-solar/sgeusers/yimingpeng/miniconda3/bin/:$PATH
-source activate ddpg_baselines
+source activate cmaes_baselines
 
 #Define path
 experimentFolder="cmaes_baselines"

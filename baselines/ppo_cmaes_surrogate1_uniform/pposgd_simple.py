@@ -239,6 +239,17 @@ def learn(env, test_env, policy_fn, *,
     pol_var_list = [v for v in var_list if v.name.split("/")[1].startswith(
         "pol")]
 
+    layer_var_list = []
+    for i in range(pi.num_hid_layers):
+        layer_var_list.append([v for v in pol_var_list if v.name.split("/")[2].startswith(
+            'fc%i' % (i + 1))])
+    logstd_var_list = [v for v in pol_var_list if v.name.split("/")[2].startswith(
+        "logstd")]
+    if len(logstd_var_list) != 0:
+        layer_var_list.append([v for v in pol_var_list if v.name.split("/")[2].startswith(
+            "final")] + logstd_var_list)
+
+
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                                 losses + [U.flatgrad(vf_loss, vf_var_list)])
 
@@ -261,8 +272,14 @@ def learn(env, test_env, policy_fn, *,
 
     U.initialize()
 
-    get_pi_flat_params = U.GetFlat(pol_var_list)
-    set_pi_flat_params = U.SetFromFlat(pol_var_list)
+    layer_set_operate_list = []
+    layer_get_operate_list = []
+    for var in layer_var_list:
+        layer_set_operate_list.append(U.SetFromFlat(var))
+        layer_get_operate_list.append(U.GetFlat(var))
+
+    # get_pi_layer_flat_params = U.GetFlat(pol_var_list)
+    # set_pi_layer_flat_params = U.SetFromFlat(pol_var_list)
 
     vf_adam.sync()
 
@@ -295,6 +312,7 @@ def learn(env, test_env, policy_fn, *,
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
+    indices = []  # maintain all selected indices for each iteration
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             print("Max time steps")
@@ -347,47 +365,80 @@ def learn(env, test_env, policy_fn, *,
                     losses.append(vf_losses)
                 logger.log(fmt_row(13, np.mean(losses, axis = 0)))
 
-        # CMAES Train Policy
-        assign_old_eq_new()  # set old parameter values to new parameter values
-        assign_backup_eq_new()  # backup current policy
-        flatten_weights = get_pi_flat_params()
-        opt = cma.CMAOptions()
-        opt['tolfun'] = max_fitness
-        opt['popsize'] = popsize
-        opt['maxiter'] = gensize
-        opt['verb_disp'] = 0
-        opt['verb_log'] = 0
-        opt['seed'] = seed
-        opt['AdaptSigma'] = True
-        es = cma.CMAEvolutionStrategy(flatten_weights,
-                                      sigma, opt)
-        while True:
-            if es.countiter >= gensize:
-                logger.log("Max generations for current layer")
-                break
-            logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
-            logger.log("Sigma=" + str(es.sigma))
-            solutions = es.ask()
-            costs = []
-            lens = []
-
+        for i in range(len(layer_var_list)):
+            # CMAES Train Policy
+            assign_old_eq_new()  # set old parameter values to new parameter values
             assign_backup_eq_new()  # backup current policy
+            flatten_weights = layer_get_operate_list[i]()
+            opt = cma.CMAOptions()
+            opt['tolfun'] = max_fitness
+            opt['popsize'] = popsize
+            opt['maxiter'] = gensize
+            opt['verb_disp'] = 0
+            opt['verb_log'] = 0
+            opt['seed'] = seed
+            opt['AdaptSigma'] = True
 
-            for id, solution in enumerate(solutions):
-                set_pi_flat_params(solution)
-                losses = []
-                cost = compute_pol_losses(ob, ac, atarg, tdlamret, cur_lrmult)
-                costs.append(cost[0])
-                assign_new_eq_backup()
-            # Weights decay
-            l2_decay = compute_weight_decay(0.99, solutions)
-            costs += l2_decay
-            costs, real_costs = fitness_rank(costs)
-            es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
-            best_solution = es.result[0]
-            best_fitness = es.result[1]
-            logger.log("Best Solution Fitness:" + str(best_fitness))
-            set_pi_flat_params(best_solution)
+            if len(indices) < len(layer_var_list):
+                selected_index, init_weights = uniform_select(flatten_weights,
+                                                              0.5)  # 0.5 means 50% proportion of params are selected
+                indices.append(selected_index)
+            else:
+                if np.random.randn() < epsilon:
+                    selected_index, init_weights = uniform_select(flatten_weights, 0.5)
+                    indices.append(selected_index)
+                    logger.log("Random: select new weights")
+                else:
+                    selected_index = indices[i]
+                    init_weights = np.take(flatten_weights, selected_index)
+            es = cma.CMAEvolutionStrategy(flatten_weights,
+                                          sigma, opt)
+            while True:
+                if es.countiter >= gensize:
+                    logger.log("Max generations for current layer")
+                    break
+                logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
+                logger.log("Sigma=" + str(es.sigma))
+                solutions = es.ask()
+                costs = []
+                lens = []
+
+                assign_backup_eq_new()  # backup current policy
+
+                for id, solution in enumerate(solutions):
+                    np.put(flatten_weights, selected_index, solution)
+                    layer_set_operate_list[i](flatten_weights)
+                    losses = []
+                    cost = compute_pol_losses(ob, ac, atarg, tdlamret, cur_lrmult)
+                    costs.append(cost[0])
+                    assign_new_eq_backup()
+                # Weights decay
+                l2_decay = compute_weight_decay(0.99, solutions)
+                costs += l2_decay
+                costs, real_costs = fitness_rank(costs)
+                es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
+                # best_solution = es.result[0]
+                # best_fitness = es.result[1]
+                # logger.log("Best Solution Fitness:" + str(best_fitness))
+                # set_pi_flat_params(best_solution)
+                if -es.result[1] > best_fitness:
+                    best_solution = np.copy(es.result[0])
+                    best_fitness = -es.result[1]
+                    np.put(flatten_weights, selected_index, best_solution)
+                    layer_set_operate_list[i](flatten_weights)
+                    logger.log("Update the layer")
+                else:
+                    logger.log("Epsilon = " + str(epsilon))
+                    if np.random.randn() < epsilon:
+                        best_solution = np.copy(es.result[0])
+                        best_fitness = -es.result[1]
+                        np.put(flatten_weights, selected_index, best_solution)
+                        layer_set_operate_list[i](flatten_weights)
+                        logger.log("Random: Update the layer")
+                    die_out_count += 1
+                if die_out_count >= 3:
+                    logger.log("No improvements for 3 times, break the evolution")
+                    break
 
         iters_so_far += 1
         episodes_so_far += sum(lens)

@@ -14,6 +14,8 @@ class MlpPolicy(object):
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
         assert isinstance(ob_space, gym.spaces.Box)
 
+        # Add the variable to track layers
+        self.num_hid_layers = num_hid_layers
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
 
