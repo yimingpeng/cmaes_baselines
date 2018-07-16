@@ -90,13 +90,13 @@ cp -r /vol/grid-solar/sgeusers/achen/$experimentFolder .
 # cd into repo
 #
 echo ==GOING INTO EXPERIMENT DIRECTORY==
-cd $experimentFolder/$experimentName/openai_es/
+cd $experimentFolder/$experimentName/ppo1/
 
 #
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env HalfCheetahBulletEnv-v0 --seed $SGE_TASK_ID
+python $pyName --env BipedalWalker-v2 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la

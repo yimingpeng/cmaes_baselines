@@ -14,8 +14,15 @@ __status__ = "Prototype"
 # Scripts for generating GCP startup scripts
 import os
 
-f = open("../../grid_scripts/template.sh")
-f2 = open("../../grid_scripts/run_grid_ex_template.sh")
+#person = 'yimingpeng'
+person = 'achen'
+
+if person == 'achen':
+    f = open("../../grid_scripts/aaron_template.sh")
+    f2 = open("../../grid_scripts/run_aaron_grid_ex_template.sh")
+else:
+    f = open("../../grid_scripts/template.sh")
+    f2 = open("../../grid_scripts/run_grid_ex_template.sh")
 algorithms = ["PPO", "CMAES", "CMAES_Layer_Entire",
               "CMAES_Layer_uniform", "DDPG",
               "ACKTR", "openai_es", "uber_ga",
