@@ -344,7 +344,7 @@ def learn(env, test_env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(0.1 - float(timesteps_so_far) / max_timesteps, 0)
+        epsilon = max(0.05 - float(timesteps_so_far) / max_timesteps, 0)
         sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
         logger.log("********** Iteration %i ************" % iters_so_far)
 
@@ -392,17 +392,17 @@ def learn(env, test_env, policy_fn, *,
 
             if len(indices) < len(layer_var_list):
                 selected_index, init_weights = uniform_select(flatten_weights,
-                                                              0.5)  # 0.5 means 50% proportion of params are selected
+                                                              1.0)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
                 if np.random.randn() < epsilon:
-                    selected_index, init_weights = uniform_select(flatten_weights, 0.5)
+                    selected_index, init_weights = uniform_select(flatten_weights, 1.0)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
-            es = cma.CMAEvolutionStrategy(flatten_weights,
+            es = cma.CMAEvolutionStrategy(init_weights,
                                           sigma, opt)
             die_out_count = 0
             while True:
@@ -448,10 +448,10 @@ def learn(env, test_env, policy_fn, *,
                         layer_set_operate_list[i](flatten_weights)
                         logger.log("Random: Update the layer")
                     die_out_count += 1
-                if die_out_count >= 3:
+                if die_out_count >= 5:
                     logger.log("No improvements for 3 times, break the evolution")
                     break
-
+            es = None
         iters_so_far += 1
         episodes_so_far += sum(lens)
 

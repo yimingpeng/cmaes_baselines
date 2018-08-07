@@ -395,14 +395,14 @@ def learn(env, test_env, policy_fn, *,
                                                               0.5)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
-                if np.random.randn() < epsilon:
+                if np.random.rand() < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
-            es = cma.CMAEvolutionStrategy(flatten_weights,
+            es = cma.CMAEvolutionStrategy(init_weights,
                                           sigma, opt)
             die_out_count = 0
             while True:
@@ -433,25 +433,30 @@ def learn(env, test_env, policy_fn, *,
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
                 # set_pi_flat_params(best_solution)
-                if -es.result[1] > best_fitness:
-                    best_solution = np.copy(es.result[0])
-                    best_fitness = -es.result[1]
-                    np.put(flatten_weights, selected_index, best_solution)
-                    layer_set_operate_list[i](flatten_weights)
-                    logger.log("Update the layer")
-                else:
-                    logger.log("Epsilon = " + str(epsilon))
-                    if np.random.randn() < epsilon:
-                        best_solution = np.copy(es.result[0])
-                        best_fitness = -es.result[1]
-                        np.put(flatten_weights, selected_index, best_solution)
-                        layer_set_operate_list[i](flatten_weights)
-                        logger.log("Random: Update the layer")
-                    die_out_count += 1
-                if die_out_count >= 3:
-                    logger.log("No improvements for 3 times, break the evolution")
-                    break
-
+                best_solution = np.copy(es.result[0])
+                best_fitness = -es.result[1]
+                logger.log("Best Solution Fitness:" + str(best_fitness))
+                np.put(flatten_weights, selected_index, best_solution)
+                layer_set_operate_list[i](flatten_weights)
+                # if -es.result[1] > best_fitness:
+                #     best_solution = np.copy(es.result[0])
+                #     best_fitness = -es.result[1]
+                #     np.put(flatten_weights, selected_index, best_solution)
+                #     layer_set_operate_list[i](flatten_weights)
+                #     logger.log("Update the layer")
+                # else:
+                #     logger.log("Epsilon = " + str(epsilon))
+                #     if np.random.randn() < epsilon:
+                #         best_solution = np.copy(es.result[0])
+                #         best_fitness = -es.result[1]
+                #         np.put(flatten_weights, selected_index, best_solution)
+                #         layer_set_operate_list[i](flatten_weights)
+                #         logger.log("Random: Update the layer")
+                #     die_out_count += 1
+                # if die_out_count >= 10:
+                #     logger.log("No improvements for 3 times, break the evolution")
+                #     break
+            es = None
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
