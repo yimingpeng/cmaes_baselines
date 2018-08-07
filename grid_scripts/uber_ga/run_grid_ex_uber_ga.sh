@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # the repository
-cd /vol/grid-solar/sgeusers/achen/cmaes_baselines/grid_scripts/uber_ga/
+cd /vol/grid-solar/sgeusers/yimingpeng/cmaes_baselines/grid_scripts/uber_ga/
 
 # clone the repository
 # git clone https://yimingpeng:Aa19820713@github.com/yimingpeng/cmaes_baselines &
