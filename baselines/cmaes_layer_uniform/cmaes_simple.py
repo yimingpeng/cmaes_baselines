@@ -282,7 +282,7 @@ def learn(base_env,
                                                               0.5)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
-                if np.random.randn() < epsilon:
+                if np.random.rand() < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
@@ -322,30 +322,36 @@ def learn(base_env,
                 costs += l2_decay
                 costs, real_costs = fitness_normalization(costs)
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
-                if -es.result[1] > best_fitness:
-                    best_solution = np.copy(es.result[0])
-                    best_fitness = -es.result[1]
-                    np.put(flatten_weights, selected_index, best_solution)
-                    layer_set_operate_list[i](flatten_weights)
-                    logger.log("Update the layer")
-                else:
-                    logger.log("Epsilon = " + str(epsilon))
-                    if np.random.randn() < epsilon:
-                        best_solution = np.copy(es.result[0])
-                        best_fitness = -es.result[1]
-                        np.put(flatten_weights, selected_index, best_solution)
-                        layer_set_operate_list[i](flatten_weights)
-                        logger.log("Random: Update the layer")
-                    die_out_count += 1
-                if die_out_count >= 3:
-                    logger.log("No improvements for 3 times, break the evolution")
-                    break
+                best_solution = np.copy(es.result[0])
+                best_fitness = -es.result[1]
+                np.put(flatten_weights, selected_index, best_solution)
+                layer_set_operate_list[i](flatten_weights)
+                logger.log("Update the layer")
+                # if -es.result[1] > best_fitness:
+                #     best_solution = np.copy(es.result[0])
+                #     best_fitness = -es.result[1]
+                #     np.put(flatten_weights, selected_index, best_solution)
+                #     layer_set_operate_list[i](flatten_weights)
+                #     logger.log("Update the layer")
+                # else:
+                #     logger.log("Epsilon = " + str(epsilon))
+                #     if np.random.randn() < epsilon:
+                #         best_solution = np.copy(es.result[0])
+                #         best_fitness = -es.result[1]
+                #         np.put(flatten_weights, selected_index, best_solution)
+                #         layer_set_operate_list[i](flatten_weights)
+                #         logger.log("Random: Update the layer")
+                #     die_out_count += 1
+                # if die_out_count >= 3:
+                #     logger.log("No improvements for 3 times, break the evolution")
+                #     break
                 logger.log("Generation:", es.countiter)
                 logger.log("Best Solution Fitness:", best_fitness)
 
                 ob = ob_segs["ob"]
                 if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
                 episodes_so_far += sum(lens)
+            es = None
         iters_so_far += 1
 
 

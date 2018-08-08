@@ -51,7 +51,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
+def traj_segment_generator(pi, env, horizon, stochastic):
     # Trajectories generators
     global timesteps_so_far
     t = 0
@@ -77,7 +77,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(eval_gen)
+            result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -118,15 +118,11 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
         index_count += 1
 
 
-def result_record(seg_gen):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
-        episodes_so_far, tstart
-    eval_seg = seg_gen.__next__()
-    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
+        episodes_so_far, tstart,best_fitness
+    if best_fitness != -np.inf:
+        rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -177,7 +173,7 @@ def uniform_select(weights, proportion):
     return index, np.take(weights, index)
 
 
-def learn(env, test_env, policy_fn, *,
+def learn(env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
           clip_param, entcoeff,  # clipping parameter epsilon, entropy coeff
           optim_epochs, optim_stepsize, optim_batchsize,  # optimization hypers
@@ -284,8 +280,10 @@ def learn(env, test_env, policy_fn, *,
     layer_set_operate_list = []
     layer_get_operate_list = []
     for var in layer_var_list:
-        layer_set_operate_list.append(U.SetFromFlat(var))
-        layer_get_operate_list.append(U.GetFlat(var))
+        set_pi_layer_flat_params = U.SetFromFlat(var)
+        layer_set_operate_list.append(set_pi_layer_flat_params)
+        get_pi_layer_flat_params = U.GetFlat(var)
+        layer_get_operate_list.append(get_pi_layer_flat_params)
 
     # get_pi_layer_flat_params = U.GetFlat(pol_var_list)
     # set_pi_layer_flat_params = U.SetFromFlat(pol_var_list)
@@ -303,19 +301,20 @@ def learn(env, test_env, policy_fn, *,
     lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
     rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
 
-    best_fitness = np.inf
+    best_fitness = -np.inf
 
-    eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True,
-                                     eval_gen = eval_gen)  # For train V Func
+    eval_seq = traj_segment_generator_eval(pi, env,
+                                          timesteps_per_actorbatch,
+                                          stochastic = True)
+    # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
     # Build generator for all solutions
     actors = []
-    best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, env,
                                           timesteps_per_actorbatch,
-                                          stochastic = True, eval_gen = eval_gen)
+                                          stochastic = True)
         actors.append(newActor)
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
@@ -347,6 +346,16 @@ def learn(env, test_env, policy_fn, *,
         epsilon = max(0.05 - float(timesteps_so_far) / max_timesteps, 0)
         sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
         logger.log("********** Iteration %i ************" % iters_so_far)
+        # if iters_so_far == 0:  # First test result at the beginning of training
+        #         #     eval_seg = seg_gen.__next__()
+        #         #     lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
+        #         #     listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+        #         #     lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        #         #     lenbuffer.extend(lens)
+        #         #     rewbuffer.extend(rews)
+        eval_seg = eval_seq.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
 
         # Generate new samples
         # Train V func
@@ -433,24 +442,29 @@ def learn(env, test_env, policy_fn, *,
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
                 # set_pi_flat_params(best_solution)
-                if -es.result[1] > best_fitness:
-                    best_solution = np.copy(es.result[0])
-                    best_fitness = -es.result[1]
-                    np.put(flatten_weights, selected_index, best_solution)
-                    layer_set_operate_list[i](flatten_weights)
-                    logger.log("Update the layer")
-                else:
-                    logger.log("Epsilon = " + str(epsilon))
-                    if np.random.randn() < epsilon:
-                        best_solution = np.copy(es.result[0])
-                        best_fitness = -es.result[1]
-                        np.put(flatten_weights, selected_index, best_solution)
-                        layer_set_operate_list[i](flatten_weights)
-                        logger.log("Random: Update the layer")
-                    die_out_count += 1
-                if die_out_count >= 5:
-                    logger.log("No improvements for 3 times, break the evolution")
-                    break
+                best_solution = np.copy(es.result[0])
+                best_fitness = -es.result[1]
+                np.put(flatten_weights, selected_index, best_solution)
+                layer_set_operate_list[i](flatten_weights)
+                logger.log("Update the layer")
+                # if -es.result[1] > best_fitness:
+                #     best_solution = np.copy(es.result[0])
+                #     best_fitness = -es.result[1]
+                #     np.put(flatten_weights, selected_index, best_solution)
+                #     layer_set_operate_list[i](flatten_weights)
+                #     logger.log("Update the layer")
+                # else:
+                #     # logger.log("Epsilon = " + str(epsilon))
+                #     # if np.random.randn() < epsilon:
+                #     #     best_solution = np.copy(es.result[0])
+                #     #     best_fitness = -es.result[1]
+                #     #     np.put(flatten_weights, selected_index, best_solution)
+                #     #     layer_set_operate_list[i](flatten_weights)
+                #     #     logger.log("Random: Update the layer")
+                #     die_out_count += 1
+                # if die_out_count >= 5:
+                #     logger.log("No improvements for 3 times, break the evolution")
+                #     break
             es = None
         iters_so_far += 1
         episodes_so_far += sum(lens)
