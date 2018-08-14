@@ -216,7 +216,7 @@ def learn(base_env,
     opt['maxiter'] = gensize
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
-    opt['seed'] = seed
+    # opt['seed'] = seed
     opt['AdaptSigma'] = True
     # opt['bounds'] = bounds
     es = cma.CMAEvolutionStrategy(flatten_weights,
