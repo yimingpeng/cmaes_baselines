@@ -22,10 +22,10 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
-    gensize = 10 # gen size for each iteration
+    gensize = 30 # gen size for each iteration
     bounds = [-5.0, 5.0]
     sigma = 0.1
-    eval_iters = 3
+    eval_iters = 1
     from baselines.cmaes_layer_entire import mlp_policy, cmaes_simple
     U.make_session(num_cpu=1).__enter__()
 
@@ -51,7 +51,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-Layer-Entire-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

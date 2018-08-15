@@ -194,8 +194,10 @@ def learn(base_env,
     layer_set_operate_list = []
     layer_get_operate_list = []
     for var in layer_var_list:
-        layer_set_operate_list.append(U.SetFromFlat(var))
-        layer_get_operate_list.append(U.GetFlat(var))
+        set_pi_layer_flat_params = U.SetFromFlat(var)
+        layer_set_operate_list.append(set_pi_layer_flat_params)
+        get_pi_layer_flat_params = U.GetFlat(var)
+        layer_get_operate_list.append(get_pi_layer_flat_params)
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, best_fitness
@@ -231,6 +233,14 @@ def learn(base_env,
                                           eval_iters = eval_iters, seg_gen = seg_gen)
         actors.append(newActor)
     indices = []  # maintain all selected indices for each iteration
+    opt = cma.CMAOptions()
+    opt['tolfun'] = max_fitness
+    opt['popsize'] = popsize
+    opt['maxiter'] = gensize
+    opt['verb_disp'] = 0
+    opt['verb_log'] = 0
+    # opt['seed'] = seed
+    opt['AdaptSigma'] = True
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -246,8 +256,8 @@ def learn(base_env,
             break
 
         # Linearly decay the exploration and sigma
-        epsilon = max(0.1 - float(timesteps_so_far) / max_timesteps, 0)
-        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
+        epsilon = max(0.5 - float(timesteps_so_far) / max_timesteps, 0)
+        # sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0.0000001)
 
         logger.log("********** Iteration %i ************" % iters_so_far)
         # if iters_so_far == 0:  # First test result at the beginning of training
@@ -268,21 +278,16 @@ def learn(base_env,
             assign_backup_eq_new()  # backup current policy
             logger.log("Current Layer:" + str(layer_var_list[i]))
             flatten_weights = layer_get_operate_list[i]()
-            opt = cma.CMAOptions()
-            opt['tolfun'] = max_fitness
-            opt['popsize'] = popsize
-            opt['maxiter'] = gensize
-            opt['verb_disp'] = 0
-            opt['verb_log'] = 0
-            opt['seed'] = seed
-            opt['AdaptSigma'] = False
             # opt['bounds'] = bounds
             if len(indices) < len(layer_var_list):
                 selected_index, init_weights = uniform_select(flatten_weights,
                                                               0.5)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
-                if np.random.rand() < epsilon:
+                rand = np.random.uniform()
+                print("Rand-num:", rand)
+                print("epsilon:", epsilon)
+                if  rand < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
@@ -291,7 +296,7 @@ def learn(base_env,
                     init_weights = np.take(flatten_weights, selected_index)
 
             es = cma.CMAEvolutionStrategy(init_weights,
-                                          sigma_adapted, opt)
+                                          sigma, opt)
             costs = None
             best_solution = None
 
@@ -318,15 +323,24 @@ def learn(base_env,
                         ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis = 0)
                     assign_new_eq_backup()
                 # Weights decay
-                l2_decay = compute_weight_decay(0.999, solutions)
+                l2_decay = compute_weight_decay(0.01, solutions)
                 costs += l2_decay
                 costs, real_costs = fitness_normalization(costs)
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
-                best_solution = np.copy(es.result[0])
-                best_fitness = -es.result[1]
-                np.put(flatten_weights, selected_index, best_solution)
-                layer_set_operate_list[i](flatten_weights)
-                logger.log("Update the layer")
+
+                if -es.result[1] > best_fitness:
+                    best_solution = np.copy(es.result[0])
+                    best_fitness = -es.result[1]
+                    np.put(flatten_weights, selected_index, best_solution)
+                    layer_set_operate_list[i](flatten_weights)
+                    logger.log("Update the layer")
+                    die_out_count = 0
+                else:
+                    die_out_count += 1
+                if die_out_count >= 10:
+                    logger.log("No improvements for 10 generations, break the evolution")
+                    break
+
                 # if -es.result[1] > best_fitness:
                 #     best_solution = np.copy(es.result[0])
                 #     best_fitness = -es.result[1]
@@ -341,10 +355,7 @@ def learn(base_env,
                 #         np.put(flatten_weights, selected_index, best_solution)
                 #         layer_set_operate_list[i](flatten_weights)
                 #         logger.log("Random: Update the layer")
-                #     die_out_count += 1
-                # if die_out_count >= 3:
-                #     logger.log("No improvements for 3 times, break the evolution")
-                #     break
+
                 logger.log("Generation:", es.countiter)
                 logger.log("Best Solution Fitness:", best_fitness)
 
@@ -352,6 +363,8 @@ def learn(base_env,
                 if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
                 episodes_so_far += sum(lens)
             es = None
+            import gc
+            gc.collect()
         iters_so_far += 1
 
 

@@ -51,7 +51,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
+def traj_segment_generator(pi, env, horizon, stochastic):
     # Trajectories generators
     global timesteps_so_far
     t = 0
@@ -77,7 +77,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record(eval_gen)
+            result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
@@ -118,15 +118,11 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_gen):
         index_count += 1
 
 
-def result_record(seg_gen):
+def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
-        episodes_so_far, tstart
-    eval_seg = seg_gen.__next__()
-    lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
+        episodes_so_far, tstart, best_fitness
+    if best_fitness != -np.inf:
+        rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -167,17 +163,23 @@ def add_vtarg_and_adv(seg, gamma, lam):
         gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
     seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
-def uniform_select(weights, proportion):
+
+def slice_select(weights, proportion, part_id):
     num_of_weights = int(proportion * len(weights))
     assert num_of_weights != 0  # make sure there are something to be selected
     length = len(weights) if len(weights) < num_of_weights else \
         num_of_weights
-    index = np.random.choice(range(len(
-        weights)), length, replace = False)
+    if part_id == 1:
+        index = np.arange(0, num_of_weights)
+    elif part_id == 2:
+        index = np.arange(int(0.5 * num_of_weights), int(int(0.5 * num_of_weights) + num_of_weights) + 1)
+    else:
+        index = np.arange(int(int(0.5 * num_of_weights) + num_of_weights), len(weights))
+
     return index, np.take(weights, index)
 
 
-def learn(env, test_env, policy_fn, *,
+def learn(env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
           clip_param, entcoeff,  # clipping parameter epsilon, entropy coeff
           optim_epochs, optim_stepsize, optim_batchsize,  # optimization hypers
@@ -258,7 +260,6 @@ def learn(env, test_env, policy_fn, *,
         layer_var_list.append([v for v in pol_var_list if v.name.split("/")[2].startswith(
             "final")] + logstd_var_list)
 
-
     vf_lossandgrad = U.function([ob, ac, atarg, ret, lrmult],
                                 losses + [U.flatgrad(vf_loss, vf_var_list)])
 
@@ -284,8 +285,10 @@ def learn(env, test_env, policy_fn, *,
     layer_set_operate_list = []
     layer_get_operate_list = []
     for var in layer_var_list:
-        layer_set_operate_list.append(U.SetFromFlat(var))
-        layer_get_operate_list.append(U.GetFlat(var))
+        set_pi_layer_flat_params = U.SetFromFlat(var)
+        layer_set_operate_list.append(set_pi_layer_flat_params)
+        get_pi_layer_flat_params = U.GetFlat(var)
+        layer_get_operate_list.append(get_pi_layer_flat_params)
 
     # get_pi_layer_flat_params = U.GetFlat(pol_var_list)
     # set_pi_layer_flat_params = U.SetFromFlat(pol_var_list)
@@ -303,25 +306,39 @@ def learn(env, test_env, policy_fn, *,
     lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
     rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
 
-    best_fitness = np.inf
+    best_fitness = -np.inf
 
-    eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True,
-                                     eval_gen = eval_gen)  # For train V Func
+    eval_seq = traj_segment_generator_eval(pi, env,
+                                           timesteps_per_actorbatch,
+                                           stochastic = True)
+    # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
     # Build generator for all solutions
     actors = []
-    best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, env,
                                           timesteps_per_actorbatch,
-                                          stochastic = True, eval_gen = eval_gen)
+                                          stochastic = True)
         actors.append(newActor)
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     indices = []  # maintain all selected indices for each iteration
+
+    opt = cma.CMAOptions()
+    opt['tolfun'] = max_fitness
+    opt['popsize'] = popsize
+    opt['maxiter'] = gensize
+    opt['verb_disp'] = 0
+    opt['verb_log'] = 0
+    # opt['seed'] = seed
+    opt['AdaptSigma'] = True
+    opt['bounds'] = bounds
+    opt['tolstagnation'] = 20
+    part_id = 1
+    prev_part_id = 1
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             print("Max time steps")
@@ -344,9 +361,20 @@ def learn(env, test_env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
-        # sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
+        epsilon = max(0.5 - float(timesteps_so_far) / max_timesteps, 0)
+        # epsilon = 0.2
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 10e-5)
         logger.log("********** Iteration %i ************" % iters_so_far)
+        # if iters_so_far == 0:  # First test result at the beginning of training
+        #         #     eval_seg = seg_gen.__next__()
+        #         #     lrlocal = (eval_seg["ep_lens"], eval_seg["ep_rets"])  # local values
+        #         #     listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+        #         #     lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        #         #     lenbuffer.extend(lens)
+        #         #     rewbuffer.extend(rews)
+        eval_seg = eval_seq.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
 
         # Generate new samples
         # Train V func
@@ -364,7 +392,6 @@ def learn(env, test_env, policy_fn, *,
 
             if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for normalization
 
-            assign_old_eq_new()  # set old parameter values to new parameter values
             # Train V function
             logger.log("Training V Func and Evaluating V Func Losses")
             for _ in range(optim_epochs):
@@ -378,32 +405,41 @@ def learn(env, test_env, policy_fn, *,
 
         for i in range(len(layer_var_list)):
             # CMAES Train Policy
-            assign_old_eq_new()  # set old parameter values to new parameter values
             assign_backup_eq_new()  # backup current policy
             flatten_weights = layer_get_operate_list[i]()
-            opt = cma.CMAOptions()
-            opt['tolfun'] = max_fitness
-            opt['popsize'] = popsize
-            opt['maxiter'] = gensize
-            opt['verb_disp'] = 0
-            opt['verb_log'] = 0
-            opt['seed'] = seed
-            opt['AdaptSigma'] = True
-
             if len(indices) < len(layer_var_list):
-                selected_index, init_weights = uniform_select(flatten_weights,
-                                                              0.8)  # 0.5 means 50% proportion of params are selected
+                selected_index, init_weights = slice_select(flatten_weights,
+                                                            0.5, part_id)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
-                if np.random.rand() < epsilon:
-                    selected_index, init_weights = uniform_select(flatten_weights, 0.8)
+                rand = np.random.uniform()
+                print("Random-Number:", rand)
+                print("Epsilon:", epsilon)
+                if rand < epsilon:
+                    if part_id == 1 and prev_part_id == 1:
+                        part_id = 2
+                    elif part_id == 2 and prev_part_id == 1:
+                        part_id = 3
+                        prev_part_id = 2
+                    elif part_id == 3 and prev_part_id == 2:
+                        part_id = 2
+                        prev_part_id = 3
+                    elif part_id == 2 and prev_part_id == 3:
+                        part_id = 1
+                        prev_part_id = 2
+                    elif part_id == 1 and prev_part_id == 2:
+                        part_id = 2
+                        prev_part_id = 1
+
+                    selected_index, init_weights = slice_select(flatten_weights, 0.5, part_id)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
+            print(selected_index)
             es = cma.CMAEvolutionStrategy(init_weights,
-                                          sigma, opt)
+                                          sigma_adapted, opt)
             die_out_count = 0
             while True:
                 if es.countiter >= gensize:
@@ -425,6 +461,7 @@ def learn(env, test_env, policy_fn, *,
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
+                #
                 l2_decay = compute_weight_decay(0.01, solutions)
                 costs += l2_decay
                 costs, real_costs = fitness_rank(costs)
@@ -435,9 +472,9 @@ def learn(env, test_env, policy_fn, *,
                 # set_pi_flat_params(best_solution)
                 best_solution = np.copy(es.result[0])
                 best_fitness = -es.result[1]
-                logger.log("Best Solution Fitness:" + str(best_fitness))
                 np.put(flatten_weights, selected_index, best_solution)
                 layer_set_operate_list[i](flatten_weights)
+                logger.log("Update the layer")
                 # if -es.result[1] > best_fitness:
                 #     best_solution = np.copy(es.result[0])
                 #     best_fitness = -es.result[1]
@@ -445,15 +482,15 @@ def learn(env, test_env, policy_fn, *,
                 #     layer_set_operate_list[i](flatten_weights)
                 #     logger.log("Update the layer")
                 # else:
-                #     logger.log("Epsilon = " + str(epsilon))
-                #     if np.random.randn() < epsilon:
-                #         best_solution = np.copy(es.result[0])
-                #         best_fitness = -es.result[1]
-                #         np.put(flatten_weights, selected_index, best_solution)
-                #         layer_set_operate_list[i](flatten_weights)
-                #         logger.log("Random: Update the layer")
+                #     # logger.log("Epsilon = " + str(epsilon))
+                #     # if np.random.randn() < epsilon:
+                #     #     best_solution = np.copy(es.result[0])
+                #     #     best_fitness = -es.result[1]
+                #     #     np.put(flatten_weights, selected_index, best_solution)
+                #     #     layer_set_operate_list[i](flatten_weights)
+                #     #     logger.log("Random: Update the layer")
                 #     die_out_count += 1
-                # if die_out_count >= 10:
+                # if die_out_count >= 5:
                 #     logger.log("No improvements for 3 times, break the evolution")
                 #     break
             es = None

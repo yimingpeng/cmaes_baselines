@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import inspect
+# Add the current folder to PYTHONPATH by Yiming
 import os
 import sys
 
@@ -7,26 +7,21 @@ sys.path.append(
     os.path.abspath(
         os.path.join(
             os.path.abspath(os.path.join(os.getcwd(), os.pardir)), os.pardir)))
-currentdir = os.path.dirname(
-    os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(os.path.dirname(currentdir))
-os.sys.path.insert(0, parentdir)
 
-# very important, don't remove, otherwise pybullet cannot run (reasons are unknown)
-import pybullet_envs
-from baselines.common.cmd_util import pybullet_arg_parser, make_pybullet_env
+from baselines.common.cmd_util import gym_ctrl_arg_parser, \
+    make_gym_control_env
 from baselines.common import tf_util as U
 from baselines import logger
 
 
 def train(env_id, num_timesteps, seed):
-    max_fitness = -100000
-    popsize = 32
-    gensize = 30 # gen size for each iteration
+    max_fitness = -10000
+    popsize = 128
+    gensize = 2000
     bounds = [-5.0, 5.0]
     sigma = 0.1
     eval_iters = 3
-    from baselines.cmaes_layer_uniform import mlp_policy, cmaes_simple
+    from baselines.cmaes import mlp_policy, cmaes_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
@@ -34,7 +29,7 @@ def train(env_id, num_timesteps, seed):
                                     ac_space=ac_space,
                                     hid_size=64, num_hid_layers=2)
 
-    base_env = make_pybullet_env(env_id, seed)
+    base_env = make_gym_control_env(env_id, seed)
     cmaes_simple.learn(base_env,
                        policy_fn,
                        max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
@@ -50,8 +45,8 @@ def train(env_id, num_timesteps, seed):
 
 
 def main():
-    args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-Layer-Uniform-"+args.env)
+    args = gym_ctrl_arg_parser().parse_args()
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

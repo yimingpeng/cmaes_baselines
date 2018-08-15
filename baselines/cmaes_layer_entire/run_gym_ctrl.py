@@ -16,8 +16,8 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -10000
-    popsize = 5
-    gensize = 10 # gen size for each iteration
+    popsize = 32
+    gensize = 30 # gen size for each iteration
     bounds = [-5.0, 5.0]
     sigma = 0.1
     eval_iters = 3
@@ -46,7 +46,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-"+args.env)
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "CMAES-Layer-Entire-"+args.env)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

@@ -1637,6 +1637,10 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
                     s += ' (1/ccov=' + str(round(1. / (self.sp.c1 + self.sp.cmu))) + ')'
                 print('   Covariance matrix is diagonal' + s)
 
+    def _set_sigma(self, sigma):
+        self.sigma0 = sigma
+        self.sigma = sigma
+
     def _set_x0(self, x0):
         if utils.is_str(x0):
             if type(x0) is not str:

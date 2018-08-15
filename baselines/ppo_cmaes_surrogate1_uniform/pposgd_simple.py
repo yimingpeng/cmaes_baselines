@@ -121,8 +121,9 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart,best_fitness
-    if best_fitness != -np.inf:
-        rewbuffer.append(best_fitness)
+    print(rewbuffer)
+    # if best_fitness != -np.inf:
+    #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -146,22 +147,22 @@ def compute_weight_decay(weight_decay, model_param_list):
     return weight_decay * np.mean(model_param_grid * model_param_grid, axis = 1)
 
 
-def add_vtarg_and_adv(seg, gamma, lam):
+def add_vtarg_and_adv(segs, gamma, lam):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
     """
-    new = np.append(seg["new"],
+    new = np.append(segs["new"],
                     0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
-    vpred = np.append(seg["vpred"], seg["nextvpred"])
-    T = len(seg["rew"])
-    seg["adv"] = gaelam = np.empty(T, 'float32')
-    rew = seg["rew"]
+    vpred = np.append(segs["vpred"], segs["nextvpred"])
+    T = len(segs["rew"])
+    segs["adv"] = gaelam = np.empty(T, 'float32')
+    rew = segs["rew"]
     lastgaelam = 0
     for t in reversed(range(T)):
         nonterminal = 1 - new[t + 1]
         delta = rew[t] + gamma * vpred[t + 1] * nonterminal - vpred[t]
         gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
-    seg["tdlamret"] = seg["adv"] + seg["vpred"]
+    segs["tdlamret"] = segs["adv"] + segs["vpred"]
 
 def uniform_select(weights, proportion):
     num_of_weights = int(proportion * len(weights))
@@ -263,7 +264,6 @@ def learn(env, policy_fn, *,
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
             oldpi.get_variables(), pi.get_variables())])
-
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
                                                          for (backup_v, newv) in zipsame(
             backup_pi.get_variables(), pi.get_variables())])
@@ -309,18 +309,25 @@ def learn(env, policy_fn, *,
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
-    # Build generator for all solutions
-    actors = []
-    for i in range(popsize):
-        newActor = traj_segment_generator(pi, env,
-                                          timesteps_per_actorbatch,
-                                          stochastic = True)
-        actors.append(newActor)
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     indices = []  # maintain all selected indices for each iteration
+
+    opt = cma.CMAOptions()
+    opt['tolfun'] = max_fitness
+    opt['popsize'] = popsize
+    opt['maxiter'] = gensize
+    opt['verb_disp'] = 0
+    opt['verb_log'] = 0
+    # opt['seed'] = seed
+    opt['AdaptSigma'] = True
+    # opt['bounds'] = bounds
+    # opt['tolstagnation'] = 20
+    ess = []
+    segs = None
+    sum_vpred = []
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             print("Max time steps")
@@ -343,8 +350,9 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(0.05 - float(timesteps_so_far) / max_timesteps, 0)
-        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
+        epsilon = max(0.5 - float(timesteps_so_far) / max_timesteps, 0)
+        # epsilon = 0.2
+        sigma_adapted = max(sigma - float(timesteps_so_far)/ max_timesteps, 10e-5)
         logger.log("********** Iteration %i ************" % iters_so_far)
         # if iters_so_far == 0:  # First test result at the beginning of training
         #         #     eval_seg = seg_gen.__next__()
@@ -362,18 +370,34 @@ def learn(env, policy_fn, *,
         for i in range(max_v_train_iter):
             logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
             logger.log("Generate New Samples")
-            seg = seg_gen.__next__()
-            add_vtarg_and_adv(seg, gamma, lam)
+            if iters_so_far % 2 == 0:
+                segs = None
+                seg = seg_gen.__next__()
+                if segs is None:
+                    segs = seg
+                else:
+                    segs["ob"] = np.append(segs['ob'], seg['ob'], axis=0)
+                    segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis=0)
+                    segs["ac"] = np.append(segs['ac'], seg['ac'], axis=0)
+                    segs["rew"] = np.append(segs['rew'], seg['rew'], axis=0)
+                    segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis=0)
+                    sum_vpred.append(seg["nextvpred"])
+                    segs["nextvpred"] = np.mean(sum_vpred)
+                    segs["new"] = np.append(segs['new'], seg['new'], axis=0)
+                    segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis=0)
+                    segs["ep_lens"] = np.append(segs['rew'], seg['ep_lens'], axis=0)
+                    segs["traj_index"] = np.append(segs['traj_index'], seg['traj_index'], axis=0)
 
-            ob, ac, atarg, reward, tdlamret, traj_idx = seg["ob"], seg["ac"], seg["adv"], seg["rew"], seg["tdlamret"], \
-                                                        seg["traj_index"]
+            add_vtarg_and_adv(segs, gamma, lam)
+
+            ob, ac, atarg, reward, tdlamret, traj_idx = segs["ob"], segs["ac"], segs["adv"], segs["rew"], segs["tdlamret"], \
+                                                        segs["traj_index"]
             atarg = (atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
             d = Dataset(dict(ob = ob, ac = ac, atarg = atarg, vtarg = tdlamret), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
             if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for normalization
 
-            assign_old_eq_new()  # set old parameter values to new parameter values
             # Train V function
             logger.log("Training V Func and Evaluating V Func Losses")
             for _ in range(optim_epochs):
@@ -390,30 +414,24 @@ def learn(env, policy_fn, *,
             assign_old_eq_new()  # set old parameter values to new parameter values
             assign_backup_eq_new()  # backup current policy
             flatten_weights = layer_get_operate_list[i]()
-            opt = cma.CMAOptions()
-            opt['tolfun'] = max_fitness
-            opt['popsize'] = popsize
-            opt['maxiter'] = gensize
-            opt['verb_disp'] = 0
-            opt['verb_log'] = 0
-            opt['seed'] = seed
-            opt['AdaptSigma'] = True
 
             if len(indices) < len(layer_var_list):
                 selected_index, init_weights = uniform_select(flatten_weights,
-                                                              1.0)  # 0.5 means 50% proportion of params are selected
+                                                              0.5)  # 0.5 means 50% proportion of params are selected
                 indices.append(selected_index)
             else:
-                if np.random.randn() < epsilon:
-                    selected_index, init_weights = uniform_select(flatten_weights, 1.0)
+                rand = np.random.uniform()
+                print("Random-Number:", rand)
+                print("Epsilon:", epsilon)
+                if rand < epsilon:
+                    selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
                     logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
             es = cma.CMAEvolutionStrategy(init_weights,
-                                          sigma, opt)
-            die_out_count = 0
+                                      sigma, opt)
             while True:
                 if es.countiter >= gensize:
                     logger.log("Max generations for current layer")
@@ -429,12 +447,11 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    losses = []
                     cost = compute_pol_losses(ob, ac, atarg, tdlamret, cur_lrmult)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
-                l2_decay = compute_weight_decay(0.99, solutions)
+                l2_decay = compute_weight_decay(0.001, solutions)
                 costs += l2_decay
                 costs, real_costs = fitness_rank(costs)
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
@@ -466,6 +483,8 @@ def learn(env, policy_fn, *,
                 #     logger.log("No improvements for 3 times, break the evolution")
                 #     break
             es = None
+            import gc
+            gc.collect()
         iters_so_far += 1
         episodes_so_far += sum(lens)
 

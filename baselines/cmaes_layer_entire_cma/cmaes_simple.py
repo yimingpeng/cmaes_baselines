@@ -229,6 +229,7 @@ def learn(base_env,
     # opt['seed'] = seed
     opt['AdaptSigma'] = True
     # opt['bounds'] = bounds
+    ess= []
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -257,8 +258,10 @@ def learn(base_env,
             assign_backup_eq_new()  # backup current policy
             logger.log("Current Layer:"+ str(layer_var_list[i]))
             flatten_weights = layer_get_operate_list[i]()
-            es = cma.CMAEvolutionStrategy(flatten_weights,
-                                          sigma, opt)
+            if iters_so_far == 0:
+                ess.append(cma.CMAEvolutionStrategy(flatten_weights,
+                                          sigma, opt))
+            es = ess[i]
             costs = None
             best_solution = None
 
@@ -266,6 +269,7 @@ def learn(base_env,
             while True:
                 if es.countiter >= gensize:
                     logger.log("Max generations for current layer")
+                    es.countiter = 0
                     break
                 solutions = es.ask()
                 ob_segs = None

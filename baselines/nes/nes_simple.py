@@ -7,8 +7,7 @@ import numpy as np
 from baselines import logger
 from mpi4py import MPI
 import tensorflow as tf
-from baselines.common import zipsame
-
+from baselines.common import zipsame, set_global_seeds
 
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
@@ -63,8 +62,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ob = env.reset()
         t += 1
 
-
-def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_iters):
     global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -164,35 +162,20 @@ def learn(base_env,
           max_seconds = 0,
           seed = 0
           ):
+    set_global_seeds(seed)
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = base_env.observation_space
     ac_space = base_env.action_space
     pi = policy_fn("pi", ob_space, ac_space)  # Construct network for new policy
-    backup_pi = policy_fn("backup_pi", ob_space,
-                          ac_space)  # Construct a network for every individual to adapt during the es evolution
-
-
-    var_list = pi.get_trainable_variables()
-    layer_var_list = []
-    for i in range(pi.num_hid_layers):
-        layer_var_list.append([v for v in var_list if v.name.split("/")[2].startswith(
-                'fc%i' % (i + 1))])
-    logstd_var_list = [v for v in var_list if v.name.split("/")[2].startswith(
-            "logstd")]
-    if len(logstd_var_list) != 0:
-        layer_var_list.append([v for v in var_list if v.name.split("/")[2].startswith(
-            "final")] + logstd_var_list)
+    backup_pi = policy_fn("backup_pi", ob_space, ac_space)  # Construct a network for every individual to adapt during the es evolution
 
     U.initialize()
-    layer_set_operate_list = []
-    layer_get_operate_list = []
-    for var in layer_var_list:
-        layer_set_operate_list.append(U.SetFromFlat(var))
-        layer_get_operate_list.append(U.GetFlat(var))
+    pi_set_from_flat_params = U.SetFromFlat(pi.get_trainable_variables())
+    pi_get_flat_params = U.GetFlat(pi.get_trainable_variables())
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
-        tstart, lenbuffer, rewbuffer, best_fitness
+        tstart, lenbuffer, rewbuffer,best_fitness, eval_seq
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
@@ -200,35 +183,47 @@ def learn(base_env,
     lenbuffer = deque(maxlen = 100)  # rolling buffer for episode lengths
     rewbuffer = deque(maxlen = 100)  # rolling buffer for episode rewards
 
+
     assign_backup_eq_new = U.function([], [], updates = [tf.assign(backup_v, newv)
-                                                         for (backup_v, newv) in zipsame(
+                                                      for (backup_v, newv) in zipsame(
             backup_pi.get_variables(), pi.get_variables())])
     assign_new_eq_backup = U.function([], [], updates = [tf.assign(newv, backup_v)
-                                                         for (newv, backup_v) in zipsame(
+                                                      for (newv, backup_v) in zipsame(
             pi.get_variables(), backup_pi.get_variables())])
+
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
-    seg_gen = traj_segment_generator_eval(backup_pi, base_env, timesteps_per_actorbatch, stochastic = True)
     actors = []
+    best_fitness = -np.inf
+
+    eval_seq = traj_segment_generator_eval(pi, base_env,
+                                          timesteps_per_actorbatch,
+                                          stochastic = True)
     for i in range(popsize):
         newActor = traj_segment_generator(pi, base_env,
                                           timesteps_per_actorbatch,
                                           stochastic = True,
-                                          eval_iters = eval_iters, seg_gen = seg_gen)
+                                          eval_iters = eval_iters)
         actors.append(newActor)
-    best_fitness = -np.inf
+
+    flatten_weights = pi_get_flat_params()
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
     opt['popsize'] = popsize
     opt['maxiter'] = gensize
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
-    # opt['seed'] = seed
+    opt['seed'] = seed
     opt['AdaptSigma'] = True
     # opt['bounds'] = bounds
+    es = cma.CMAEvolutionStrategy(flatten_weights,
+                                  sigma, opt)
+    costs = None
+    best_solution = None
+
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             logger.log("Max time steps")
@@ -242,69 +237,73 @@ def learn(base_env,
         elif max_seconds and time.time() - tstart >= max_seconds:
             logger.log("Max time")
             break
+        elif es.countiter >= opt['maxiter']:
+            logger.log("Max generations")
+            break
+        assign_backup_eq_new() # backup current policy
 
-        # Linearly decay the exploration
-        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 0)
-
-        logger.log("********** Iteration %i ************" % iters_so_far)
-        eval_seg = seg_gen.__next__()
+        logger.log("********** Generation %i ************" % iters_so_far)
+        eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
         lenbuffer.extend(eval_seg["ep_lens"])
         if iters_so_far == 0:
             result_record()
 
-        for i in range(len(layer_var_list)):
-            assign_backup_eq_new()  # backup current policy
-            logger.log("Current Layer:"+ str(layer_var_list[i]))
-            flatten_weights = layer_get_operate_list[i]()
-            es = cma.CMAEvolutionStrategy(flatten_weights,
-                                          sigma, opt)
-            costs = None
-            best_solution = None
+        solutions = es.ask()
+        if costs is not None:
+            solutions[np.argmax(costs)] = np.copy(best_solution)
+        ob_segs = None
+        segs = []
+        costs = []
+        lens = []
+        for id, solution in enumerate(solutions):
+            # pi.set_Flat_variables(solution)
+            pi_set_from_flat_params(solution)
+            seg = actors[id].__next__()
+            costs.append(-np.mean(seg["ep_rets"]))
+            lens.append(np.sum(seg["ep_lens"]))
+            segs.append(seg)
+            if ob_segs is None:
+                ob_segs = {'ob': np.copy(seg['ob'])}
+            else:
+                ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
+            assign_new_eq_backup()
+        fit_idx = np.array(costs).flatten().argsort()[:len(costs)]
+        solutions = np.array(solutions)[fit_idx]
+        costs = np.array(costs)[fit_idx]
+        segs = np.array(segs)[fit_idx]
+        # Weights decay
+        # costs, real_costs = fitness_shift(costs)
+        # costs, real_costs = compute_centered_ranks(costs)
+        l2_decay = compute_weight_decay(0.01, solutions)
+        costs += l2_decay
+        costs, real_costs = fitness_normalization(costs)
+        # best_solution = np.copy(solutions[0])
+        # best_fitness = -real_costs[0]
+        # rewbuffer.extend(segs[0]["ep_rets"])
+        # lenbuffer.extend(segs[0]["ep_lens"])
+        es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
+        best_solution = np.copy(es.result[0])
+        best_fitness = -es.result[1]
+        rewbuffer.extend(es.result[3]["ep_rets"])
+        lenbuffer.extend(es.result[3]["ep_lens"])
+        logger.log("Generation:", es.countiter)
+        logger.log("Best Solution Fitness:", best_fitness)
+        pi_set_from_flat_params(best_solution)
 
-            die_out_count = 0
-            while True:
-                if es.countiter >= gensize:
-                    logger.log("Max generations for current layer")
-                    break
-                solutions = es.ask()
-                ob_segs = None
-                segs = []
-                costs = []
-                lens = []
-                for id, solution in enumerate(solutions):
-                    layer_set_operate_list[i](solution)
-                    seg = actors[id].__next__()
-                    costs.append(-np.mean(seg["ep_rets"]))
-                    lens.append(np.sum(seg["ep_lens"]))
-                    segs.append(seg)
-                    if ob_segs is None:
-                        ob_segs = {'ob': np.copy(seg['ob'])}
-                    else:
-                        ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis = 0)
-                    assign_new_eq_backup()
-                # Weights decay
-                l2_decay = compute_weight_decay(0.01, solutions)
-                costs += l2_decay
-                costs, real_costs = fitness_normalization(costs)
-                es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
-                best_solution = np.copy(es.result[0])
-                best_fitness = -es.result[1]
-                rewbuffer.extend(es.result[3]["ep_rets"])
-                lenbuffer.extend(es.result[3]["ep_lens"])
-                layer_set_operate_list[i](best_solution)
-                logger.log("Update the layer")
-                logger.log("Generation:", es.countiter)
-                logger.log("Best Solution Fitness:", best_fitness)
+        ob = ob_segs["ob"]
+        if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
 
-                ob = ob_segs["ob"]
-                if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for observation normalization
-                episodes_so_far += sum(lens)
-            es = None
-            import gc
-            gc.collect()
         iters_so_far += 1
+        episodes_so_far += sum(lens)
 
+def fitness_shift(x):
+    x = np.asarray(x).flatten()
+    ranks = np.empty(len(x))
+    ranks[x.argsort()] = np.arange(len(x))
+    ranks /= (len(x) - 1)
+    ranks -= .5
+    return ranks,x
 
 def compute_weight_decay(weight_decay, model_param_list):
     model_param_grid = np.array(model_param_list)
@@ -317,6 +316,25 @@ def fitness_normalization(x):
     std = np.std(x)
     return (x - mean) / std, x
 
+def compute_centered_ranks(x):
+  """
+  https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py
+  """
+  y = compute_ranks(x.ravel()).reshape(x.shape).astype(np.float32)
+  y /= (x.size - 1)
+  y -= .5
+  return y, x
+
+def compute_ranks(x):
+  """
+  Returns ranks in [0, len(x))
+  Note: This is different from scipy.stats.rankdata, which returns ranks in [1, len(x)].
+  (https://github.com/openai/evolution-strategies-starter/blob/master/es_distributed/es.py)
+  """
+  assert x.ndim == 1
+  ranks = np.empty(len(x), dtype=int)
+  ranks[x.argsort()] = np.arange(len(x))
+  return ranks
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
