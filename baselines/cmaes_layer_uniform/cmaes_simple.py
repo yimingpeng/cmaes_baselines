@@ -285,8 +285,8 @@ def learn(base_env,
                 indices.append(selected_index)
             else:
                 rand = np.random.uniform()
-                print("Rand-num:", rand)
-                print("epsilon:", epsilon)
+                # print("Rand-num:", rand)
+                # print("epsilon:", epsilon)
                 if  rand < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
@@ -328,18 +328,18 @@ def learn(base_env,
                 costs, real_costs = fitness_normalization(costs)
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = segs)
 
-                if -es.result[1] > best_fitness:
-                    best_solution = np.copy(es.result[0])
-                    best_fitness = -es.result[1]
-                    np.put(flatten_weights, selected_index, best_solution)
-                    layer_set_operate_list[i](flatten_weights)
-                    logger.log("Update the layer")
-                    die_out_count = 0
-                else:
-                    die_out_count += 1
-                if die_out_count >= 10:
-                    logger.log("No improvements for 10 generations, break the evolution")
-                    break
+                # if -es.result[1] > best_fitness:
+                best_solution = np.copy(es.result[0])
+                best_fitness = -es.result[1]
+                np.put(flatten_weights, selected_index, best_solution)
+                layer_set_operate_list[i](flatten_weights)
+                logger.log("Update the layer")
+                #     die_out_count = 0
+                # else:
+                #     die_out_count += 1
+                # if die_out_count >= 10:
+                #     logger.log("No improvements for 10 generations, break the evolution")
+                #     break
 
                 # if -es.result[1] > best_fitness:
                 #     best_solution = np.copy(es.result[0])
