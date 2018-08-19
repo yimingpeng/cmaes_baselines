@@ -9,16 +9,16 @@ cd /vol/grid-solar/sgeusers/achen/cmaes_baselines/grid_scripts/CMAES/
 
 # setting the grid env
 need sgegrid
-qsub -t 1-5:1 CMAES_HalfCheetah.sh
-qsub -t 1-5:1 CMAES_Hopper.sh
-qsub -t 1-5:1 CMAES_InvertedDoublePendulum.sh 
-qsub -t 1-5:1 CMAES_InvertedPendulum.sh 
-qsub -t 1-5:1 CMAES_InvertedPendulumSwingup.sh 
-qsub -t 1-5:1 CMAES_Reacher.sh 
-qsub -t 1-5:1 CMAES_Walker2D.sh 
-qsub -t 1-5:1 CMAES_BipedalWalker.sh 
-qsub -t 1-5:1 CMAES_BipedalWalkerHardcore.sh 
-qsub -t 1-5:1 CMAES_LunarLanderContinuous.sh 
+qsub -t 1-10:1 CMAES_HalfCheetah.sh
+qsub -t 1-10:1 CMAES_Hopper.sh
+qsub -t 1-10:1 CMAES_InvertedDoublePendulum.sh
+qsub -t 1-10:1 CMAES_InvertedPendulum.sh
+qsub -t 1-10:1 CMAES_InvertedPendulumSwingup.sh
+qsub -t 1-10:1 CMAES_Reacher.sh
+qsub -t 1-10:1 CMAES_Walker2D.sh
+qsub -t 1-10:1 CMAES_BipedalWalker.sh
+qsub -t 1-10:1 CMAES_BipedalWalkerHardcore.sh
+qsub -t 1-10:1 CMAES_LunarLanderContinuous.sh
 
 
 
