@@ -339,6 +339,8 @@ def learn(env, policy_fn, *,
     seg = None
     segs = None
     sum_vpred = []
+    top_ten_solutions = None
+    top_ten_fitnesses = []
     while True:
         if max_timesteps and timesteps_so_far >= max_timesteps:
             print("Max time steps")
@@ -388,37 +390,12 @@ def learn(env, policy_fn, *,
 
         # Repository Train
         train_segs = {}
-        seg = seg_gen.__next__()
-        add_vtarg_and_adv(seg, gamma, lam)
-        if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
+        if iters_so_far == 0:
+            seg = seg_gen.__next__()
+            add_vtarg_and_adv(seg, gamma, lam)
+            if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        if iters_so_far != 0:
-            assign_old_eq_new()  # set old parameter values to new parameter values
-            d = Dataset(dict(ob = seg["ob"], ac = seg["ac"], atarg = segs["adv"], vtarg = seg["tdlamret"]),
-                            shuffle = not pi.recurrent)
-            optim_batchsize = optim_batchsize or ob.shape[0]
-
-            #Catch with Pi
-            logger.log("Training V Func and Evaluating V Func Losses")
-            for _ in range(optim_epochs):
-                vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-                for batch in d.iterate_once(optim_batchsize):
-                    *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                                   cur_lrmult)
-                    vf_adam.update(g, optim_stepsize * cur_lrmult)
-                    vf_losses.append(vf_loss)
-                logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-            assign_old_eq_new()  # set old parameter values to new parameter values
-            # logger.log("Optimizing...")
-            # logger.log(fmt_row(13, loss_names))
-            # Here we do a bunch of optimization epochs over the data
-            for _ in range(optim_epochs):
-                losses = [] # list of tuples, each of which gives the loss for a minibatch
-                for batch in d.iterate_once(optim_batchsize):
-                    *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult, 1.0)
-                    adam.update(g, optim_stepsize * cur_lrmult)
-                    losses.append(newlosses)
-                logger.log(fmt_row(13, np.mean(losses, axis=0)))
+        # if iters_so_far != 0:
         # rewbuffer.extend(seg["ep_rets"])
         # lenbuffer.extend(seg["ep_lens"])
         if segs is None:
@@ -523,16 +500,87 @@ def learn(env, policy_fn, *,
                 # logger.log("real_costs:"+str(real_costs))
                 # best_solution = np.copy(es.result[0])
                 # best_fitness = -es.result[1]
-                best_solution = np.copy(solutions[np.argmin(costs)])
-                best_fitness = -real_costs[np.argmin(costs)]
-                np.put(flatten_weights, selected_index, best_solution)
+                # best_solution = np.copy(solutions[np.argmin(costs)])
+                # best_fitness = -real_costs[np.argmin(costs)]
+                # np.put(flatten_weights, selected_index, best_solution)
+                # layer_set_operate_list[i](flatten_weights)
+                # logger.log("Update the layer")
+
+                top_ten_solutions = np.array(solutions)[costs.argsort()[:5]]
+                top_ten_fitnesses = []
+                for top_ten_solution in top_ten_solutions:
+                    np.put(flatten_weights, selected_index, top_ten_solution)
+                    layer_set_operate_list[i](flatten_weights)
+
+                    seg = seg_gen.__next__()
+                    add_vtarg_and_adv(seg, gamma, lam)
+                    if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
+
+                    rewbuffer.extend(seg["ep_rets"])
+                    lenbuffer.extend(seg["ep_lens"])
+
+                    if segs is None:
+                        segs = seg
+                    elif len(segs["ob"]) >= 50000:
+                        segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
+                        segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
+                        segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
+                        segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch, len(segs["rew"])), axis = 0)
+                        segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch, len(segs["vpred"])), axis = 0)
+                        segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch, len(segs["new"])), axis = 0)
+                        segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch, len(segs["adv"])), axis = 0)
+                        segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])), axis = 0)
+                        segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])), axis = 0)
+                        segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])), axis = 0)
+                    else:
+                        segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
+                        segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
+                        segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
+                        segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
+                        segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
+                        segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
+                        segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
+                        segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
+                        segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
+                        segs["ep_lens"] = np.append(segs['rew'], seg['ep_lens'], axis = 0)
+
+                    assign_old_eq_new()  # set old parameter values to new parameter values
+                    d = Dataset(dict(ob = seg["ob"], ac = seg["ac"], atarg = segs["adv"], vtarg = seg["tdlamret"]),
+                                    shuffle = not pi.recurrent)
+                    optim_batchsize = optim_batchsize or ob.shape[0]
+
+                    #Catch with Pi
+                    logger.log("Training V Func and Evaluating V Func Losses")
+                    for _ in range(optim_epochs):
+                        vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+                        for batch in d.iterate_once(optim_batchsize):
+                            *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                                           cur_lrmult)
+                            vf_adam.update(g, optim_stepsize * cur_lrmult)
+                            vf_losses.append(vf_loss)
+                        logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+
+                    assign_old_eq_new()  # set old parameter values to new parameter values
+                    # logger.log("Optimizing...")
+                    # logger.log(fmt_row(13, loss_names))
+                    # Here we do a bunch of optimization epochs over the data
+                    for _ in range(optim_epochs):
+                        losses = [] # list of tuples, each of which gives the loss for a minibatch
+                        for batch in d.iterate_once(optim_batchsize):
+                            *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult, 1.0)
+                            adam.update(g, optim_stepsize * cur_lrmult)
+                            losses.append(newlosses)
+                        logger.log(fmt_row(13, np.mean(losses, axis=0)))
+
+                    top_ten_fitnesses.append(np.mean(losses, axis = 0)[0])
+                np.put(flatten_weights, selected_index, top_ten_solutions[np.argmin(top_ten_fitnesses)])
                 layer_set_operate_list[i](flatten_weights)
-                logger.log("Update the layer")
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
                 # best_solution = es.result[0]
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
                 # set_pi_flat_params(best_solution)
+            es = None
             import gc
             gc.collect()
         iters_so_far += 1

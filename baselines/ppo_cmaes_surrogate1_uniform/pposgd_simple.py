@@ -501,12 +501,17 @@ def learn(env, policy_fn, *,
                 costs += l2_decay
                 costs, real_costs = fitness_rank(costs)
                 # logger.log("real_costs:"+str(real_costs))
-                best_solution = np.array(solutions[np.argmin(costs)])
-                best_fitness = -real_costs[np.argmin(costs)]
+                # best_solution = np.array(solutions[np.argmin(costs)])
+                # best_fitness = -real_costs[np.argmin(costs)]
+                # np.put(flatten_weights, selected_index, best_solution)
+                # layer_set_operate_list[i](flatten_weights)
+                # logger.log("Update the layer")
+                es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
+                best_solution = es.result[0]
+                best_fitness = es.result[1]
                 np.put(flatten_weights, selected_index, best_solution)
                 layer_set_operate_list[i](flatten_weights)
                 logger.log("Update the layer")
-                es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
                 # best_solution = es.result[0]
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
