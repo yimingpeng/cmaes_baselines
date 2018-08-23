@@ -384,22 +384,26 @@ def learn(env, policy_fn, *,
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
-        # rewbuffer.extend(seg["ep_rets"])
-        # lenbuffer.extend(seg["ep_lens"])
+        # Catch up
+        ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
+        d = Dataset(dict(ob = ob, ac = ac, vtarg = tdlamret), shuffle = not pi.recurrent)
+        optim_batchsize = optim_batchsize or ob.shape[0]
+
+        assign_old_eq_new()  # set old parameter values to new parameter values
+        # Train V function
+        logger.log("Training V Func and Evaluating V Func Losses")
+        for _ in range(optim_epochs):
+            vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+            for batch in d.iterate_once(optim_batchsize):
+                *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                               cur_lrmult)
+                vf_adam.update(g, optim_stepsize * cur_lrmult)
+                vf_losses.append(vf_loss)
+            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+
         if segs is None:
             segs = seg
         elif len(segs["ob"]) >= 50000:
-            # segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["ob"])), axis = 0)
-            # segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["next_ob"])), axis = 0)
-            # segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["ac"])), axis = 0)
-            # segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["rew"])), axis = 0)
-            # segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["vpred"])), axis = 0)
-            # segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["new"])), axis = 0)
-            # segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["adv"])), axis = 0)
-            # segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["tdlamret"])), axis = 0)
-            # segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["ep_rets"])), axis = 0)
-            # segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch * optim_epochs, len(segs["ep_lens"])), axis = 0)
-
             segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
             segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
             segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
@@ -497,52 +501,36 @@ def learn(env, policy_fn, *,
                 costs += l2_decay
                 costs, real_costs = fitness_rank(costs)
                 # logger.log("real_costs:"+str(real_costs))
+                best_solution = np.array(solutions[np.argmin(costs)])
+                best_fitness = -real_costs[np.argmin(costs)]
+                np.put(flatten_weights, selected_index, best_solution)
+                layer_set_operate_list[i](flatten_weights)
+                logger.log("Update the layer")
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
                 # best_solution = es.result[0]
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
                 # set_pi_flat_params(best_solution)
-                best_solution = np.copy(es.result[0])
-                best_fitness = -es.result[1]
-                np.put(flatten_weights, selected_index, best_solution)
-                layer_set_operate_list[i](flatten_weights)
-                logger.log("Update the layer")
-                # if -es.result[1] > best_fitness:
-                #     best_solution = np.copy(es.result[0])
-                #     best_fitness = -es.result[1]
-                #     np.put(flatten_weights, selected_index, best_solution)
-                #     layer_set_operate_list[i](flatten_weights)
-                #     logger.log("Update the layer")
-                # else:
-                #     # logger.log("Epsilon = " + str(epsilon))
-                #     # if np.random.randn() < epsilon:
-                #     #     best_solution = np.copy(es.result[0])
-                #     #     best_fitness = -es.result[1]
-                #     #     np.put(flatten_weights, selected_index, best_solution)
-                #     #     layer_set_operate_list[i](flatten_weights)
-                #     #     logger.log("Random: Update the layer")
-                #     die_out_count += 1
-                # if die_out_count >= 5:
-                #     logger.log("No improvements for 3 times, break the evolution")
-                #     break
+                # best_solution = np.copy(es.result[0])
+                # best_fitness = -es.result[1]
             es = None
             import gc
             gc.collect()
 
-        # Train V again to sync with new pi
-        assign_old_eq_new()  # set old parameter values to new parameter values
-        # Train V function
-        logger.log("Training V Func and Evaluating V Func Losses")
-        for _ in range(optim_epochs):
-            vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-            for batch in d.iterate_once(optim_batchsize):
-                *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                               cur_lrmult)
-                vf_adam.update(g, optim_stepsize * cur_lrmult)
-                vf_losses.append(vf_loss)
-            logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-        iters_so_far += 1
-        episodes_so_far += sum(lens)
+        # # Train V again to sync with new pi
+        # assign_old_eq_new()  # set old parameter values to new parameter values
+        # # Train V function
+        # logger.log("Training V Func and Evaluating V Func Losses")
+        # for _ in range(optim_epochs):
+        #     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+        #     for batch in d.iterate_once(optim_batchsize):
+        #         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+        #                                        cur_lrmult)
+        #         vf_adam.update(g, optim_stepsize * cur_lrmult)
+        #         vf_losses.append(vf_loss)
+        #     logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+        # iters_so_far += 1
+        # episodes_so_far += sum(lens)
 
 
 def fitness_rank(x):
