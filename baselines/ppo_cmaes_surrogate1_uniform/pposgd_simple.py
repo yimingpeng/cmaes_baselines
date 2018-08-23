@@ -399,7 +399,7 @@ def learn(env, policy_fn, *,
                                                cur_lrmult)
                 vf_adam.update(g, optim_stepsize * cur_lrmult)
                 vf_losses.append(vf_loss)
-            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         if segs is None:
             segs = seg
@@ -516,21 +516,8 @@ def learn(env, policy_fn, *,
             es = None
             import gc
             gc.collect()
-
-        # # Train V again to sync with new pi
-        # assign_old_eq_new()  # set old parameter values to new parameter values
-        # # Train V function
-        # logger.log("Training V Func and Evaluating V Func Losses")
-        # for _ in range(optim_epochs):
-        #     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-        #     for batch in d.iterate_once(optim_batchsize):
-        #         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-        #                                        cur_lrmult)
-        #         vf_adam.update(g, optim_stepsize * cur_lrmult)
-        #         vf_losses.append(vf_loss)
-        #     logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-        # iters_so_far += 1
-        # episodes_so_far += sum(lens)
+        iters_so_far += 1
+        episodes_so_far += sum(lens)
 
 
 def fitness_rank(x):
