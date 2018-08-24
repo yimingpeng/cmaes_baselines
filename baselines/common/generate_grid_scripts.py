@@ -14,8 +14,8 @@ __status__ = "Prototype"
 # Scripts for generating GCP startup scripts
 import os
 
-#person = 'yimingpeng'
-person = 'achen'
+person = 'yimingpeng'
+#person = 'achen'
 
 if person == 'achen':
     f = open("../../grid_scripts/aaron_template.sh")
@@ -26,7 +26,7 @@ else:
 algorithms = ["PPO", "CMAES", "CMAES_Layer_Entire",
               "CMAES_Layer_uniform", "DDPG",
               "ACKTR", "openai_es", "uber_ga",
-              "TRPO", "ppo_cmaes_surrogate1_uniform"]
+              "TRPO", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
 bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
                    "InvertedPendulum", "InvertedPendulumSwingup", "Reacher",
                    "Walker2D"]
