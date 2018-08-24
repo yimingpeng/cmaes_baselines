@@ -391,7 +391,7 @@ def learn(env, policy_fn, *,
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         # Train V function
-        logger.log("Training V Func and Evaluating V Func Losses")
+        logger.log("Catchup Training V Func and Evaluating V Func Losses")
         for _ in range(optim_epochs):
             vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
@@ -466,12 +466,12 @@ def learn(env, policy_fn, *,
                 indices.append(selected_index)
             else:
                 rand = np.random.uniform()
-                print("Random-Number:", rand)
-                print("Epsilon:", epsilon)
+                # print("Random-Number:", rand)
+                # print("Epsilon:", epsilon)
                 if rand < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
-                    logger.log("Random: select new weights")
+                    # logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
@@ -511,7 +511,7 @@ def learn(env, policy_fn, *,
                 best_fitness = es.result[1]
                 np.put(flatten_weights, selected_index, best_solution)
                 layer_set_operate_list[i](flatten_weights)
-                logger.log("Update the layer")
+                # logger.log("Update the layer")
                 # best_solution = es.result[0]
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))

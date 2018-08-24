@@ -363,7 +363,7 @@ def learn(env, policy_fn, *,
 
         epsilon = max(0.5 - float(timesteps_so_far)  / max_timesteps, 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 1e-14)
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         # if iters_so_far == 0:  # First test result at the beginning of training
         #         #     eval_seg = seg_gen.__next__()
@@ -503,7 +503,7 @@ def learn(env, policy_fn, *,
                     break
                 logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-14))
+                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
