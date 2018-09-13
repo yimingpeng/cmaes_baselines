@@ -140,10 +140,12 @@ def gym_ctrl_arg_parser():
     parser = arg_parser()
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="LunarLander-v2")
+    # parser.add_argument('--env', help='environment ID', type=str,
+        #                     default="LunarLanderContinuous-v2")
     parser.add_argument('--env', help='environment ID', type=str,
-                        default="LunarLanderContinuous-v2")
+                        default="BipedalWalker-v2")
     parser.add_argument('--seed', help='RNG seed', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(5e7))
+    parser.add_argument('--num-timesteps', type=int, default=int(2e7))
     return parser
 
 
@@ -160,5 +162,5 @@ def pybullet_arg_parser():
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="HumanoidBulletEnv-v0")
     parser.add_argument('--seed', help='RNG seed', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(5e7))
+    parser.add_argument('--num-timesteps', type=int, default=int(2e7))
     return parser
