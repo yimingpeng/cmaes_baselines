@@ -11,4 +11,5 @@
 #SBATCH --array=1-10     # Array definition
 
 srun export PATH=/home/yiming.peng/miniconda3/bin/:$PATH
+srun source activate cmaes_baselines
 srun python main.py --env-id HalfCheetahBulletEnv-v0 --seed $SLURM_ARRAY_TASK_ID
