@@ -383,8 +383,8 @@ def learn(env, policy_fn, *,
         # for i in range(max_v_train_iter):
         # if iters_so_far != 0 and i == 1:
         #     break
-        logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
-        logger.log("Generate New Samples")
+        # logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
+        # logger.log("Generate New Samples")
 
         # Repository Train
         train_segs = {}
@@ -399,7 +399,7 @@ def learn(env, policy_fn, *,
             optim_batchsize = optim_batchsize or ob.shape[0]
 
             #Catch with Pi
-            logger.log("Training V Func and Evaluating V Func Losses")
+            # logger.log("Training V Func and Evaluating V Func Losses")
             for _ in range(optim_epochs):
                 vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
@@ -407,7 +407,7 @@ def learn(env, policy_fn, *,
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     vf_losses.append(vf_loss)
-                logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+                # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
             assign_old_eq_new()  # set old parameter values to new parameter values
             # logger.log("Optimizing...")
             # logger.log(fmt_row(13, loss_names))
@@ -418,7 +418,7 @@ def learn(env, policy_fn, *,
                     *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult, 1.0)
                     adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(newlosses)
-                logger.log(fmt_row(13, np.mean(losses, axis=0)))
+                # logger.log(fmt_row(13, np.mean(losses, axis=0)))
         # rewbuffer.extend(seg["ep_rets"])
         # lenbuffer.extend(seg["ep_lens"])
         if segs is None:
@@ -462,7 +462,7 @@ def learn(env, policy_fn, *,
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         # Train V function
-        logger.log("Training V Func and Evaluating V Func Losses")
+        # logger.log("Training V Func and Evaluating V Func Losses")
         for _ in range(optim_epochs):
             vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
@@ -470,7 +470,7 @@ def learn(env, policy_fn, *,
                                                cur_lrmult)
                 vf_adam.update(g, optim_stepsize * cur_lrmult)
                 vf_losses.append(vf_loss)
-            logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
@@ -486,12 +486,12 @@ def learn(env, policy_fn, *,
                 indices.append(selected_index)
             else:
                 rand = np.random.uniform()
-                print("Random-Number:", rand)
-                print("Epsilon:", epsilon)
+                # print("Random-Number:", rand)
+                # print("Epsilon:", epsilon)
                 if rand < epsilon:
                     selected_index, init_weights = uniform_select(flatten_weights, 0.5)
                     indices.append(selected_index)
-                    logger.log("Random: select new weights")
+                    # logger.log("Random: select new weights")
                 else:
                     selected_index = indices[i]
                     init_weights = np.take(flatten_weights, selected_index)
@@ -501,8 +501,8 @@ def learn(env, policy_fn, *,
                 if es.countiter >= gensize:
                     logger.log("Max generations for current layer")
                     break
-                logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
-                logger.log("Sigma=" + str(es.sigma))
+                # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
+                # logger.log("Sigma=" + str(es.sigma))
                 solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
@@ -530,7 +530,7 @@ def learn(env, policy_fn, *,
                 best_fitness = es.result[1]
                 np.put(flatten_weights, selected_index, best_solution)
                 layer_set_operate_list[i](flatten_weights)
-                logger.log("Update the layer")
+                # logger.log("Update the layer")
                 # best_solution = es.result[0]
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
