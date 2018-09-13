@@ -12,6 +12,6 @@
 #SBATCH --error=%A_%a.err
 #SBATCH --output=%A_%a.out
 
-srun export PATH=/home/yiming.peng/miniconda3/bin/:$PATH
-srun source activate cmaes_baselines
+export PATH=/home/yiming.peng/miniconda3/bin/:$PATH
+source activate cmaes_baselines
 srun python run_pybullet.py --env Walker2DBulletEnv-v0 --seed $SLURM_ARRAY_TASK_ID
