@@ -40,6 +40,12 @@ for algorithm in algorithms:
                 line = line.replace("--job-name=ddpg_Walker2D", "--job-name="+algorithm+"_"+problem)
             if "/nesi/project/nesi00272/cmaes_baselines/baselines/ddpg/" in line:
                 line = line.replace("ddpg",algorithm.lower())
+            if '--error=ddpg_InvertedPendulum_$SLURM_ARRAY_TASK_ID.err' in line:
+                line = line.replace("--error=ddpg_InvertedPendulum",
+                                    "--error="+algorithm+"_"+problem+"_")
+            if '--output=ddpg_InvertedPendulum_$SLURM_ARRAY_TASK_ID.out' in line:
+                line = line.replace("--error=ddpg_InvertedPendulum",
+                                    "--error="+algorithm.lower()+"_"+problem+"_")
             if "Walker2DBulletEnv-v0" in line:
                 if algorithm == "DDPG":
                     line = "srun python main.py --env-id " + problem + "BulletEnv-v0" + " --seed $SLURM_ARRAY_TASK_ID\n"
