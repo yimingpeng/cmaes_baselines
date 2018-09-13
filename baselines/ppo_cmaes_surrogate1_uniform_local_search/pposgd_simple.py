@@ -356,14 +356,14 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far)*10  / max_timesteps, 0)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
 
         else:
             raise NotImplementedError
 
         epsilon = max(0.5 - float(timesteps_so_far)  / max_timesteps, 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 1e-8)
+        sigma_adapted = max(sigma - float(timesteps_so_far) / max_timesteps, 1e-10)
         logger.log("********** Iteration %i ************" % iters_so_far)
         # if iters_so_far == 0:  # First test result at the beginning of training
         #         #     eval_seg = seg_gen.__next__()
@@ -499,11 +499,11 @@ def learn(env, policy_fn, *,
                                           sigma_adapted, opt)
             while True:
                 if es.countiter >= gensize:
-                    logger.log("Max generations for current layer")
+                    # logger.log("Max generations for current layer")
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-10))
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
