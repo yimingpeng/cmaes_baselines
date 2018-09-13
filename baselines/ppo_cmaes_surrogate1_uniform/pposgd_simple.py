@@ -376,8 +376,8 @@ def learn(env, policy_fn, *,
         # for i in range(max_v_train_iter):
             # if iters_so_far != 0 and i == 1:
             #     break
-        logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
-        logger.log("Generate New Samples")
+        # logger.log("Iteration:" + str(iters_so_far) + " - sub-train iter for V func:" + str(i))
+        # logger.log("Generate New Samples")
 
         # Repository Train
         train_segs = {}
@@ -391,7 +391,7 @@ def learn(env, policy_fn, *,
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         # Train V function
-        logger.log("Catchup Training V Func and Evaluating V Func Losses")
+        # logger.log("Catchup Training V Func and Evaluating V Func Losses")
         for _ in range(optim_epochs):
             vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
@@ -399,7 +399,7 @@ def learn(env, policy_fn, *,
                                                cur_lrmult)
                 vf_adam.update(g, optim_stepsize * cur_lrmult)
                 vf_losses.append(vf_loss)
-            logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         if segs is None:
             segs = seg
@@ -450,7 +450,7 @@ def learn(env, policy_fn, *,
                                                cur_lrmult)
                 vf_adam.update(g, optim_stepsize * cur_lrmult)
                 vf_losses.append(vf_loss)
-            logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
@@ -479,10 +479,10 @@ def learn(env, policy_fn, *,
                                           sigma_adapted, opt)
             while True:
                 if es.countiter >= gensize:
-                    logger.log("Max generations for current layer")
+                    # logger.log("Max generations for current layer")
                     break
-                logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
-                logger.log("Sigma=" + str(es.sigma))
+                # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
+                # logger.log("Sigma=" + str(es.sigma))
                 solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
