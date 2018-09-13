@@ -475,7 +475,7 @@ def learn(env, policy_fn, *,
                                                 1.0)
                     adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(newlosses)
-                # logger.log(fmt_row(13, np.mean(losses, axis=0)))
+                logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
@@ -592,7 +592,8 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
+                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
