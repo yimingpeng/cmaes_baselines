@@ -9,8 +9,8 @@
 #SBATCH --partition=long        # specify a partition
 #SBATCH --hint=nomultithread    # don't use hyperthreading
 #SBATCH --array=1-10     # Array definition
-#SBATCH --error=openai_es_Hopper__$SLURM_ARRAY_TASK_ID.err
-#SBATCH --output=ddpg_InvertedPendulum_$SLURM_ARRAY_TASK_ID.out
+#SBATCH --error=%A_%a.err
+#SBATCH --output=%A_%a.out
 
 srun export PATH=/home/yiming.peng/miniconda3/bin/:$PATH
 srun source activate cmaes_baselines
