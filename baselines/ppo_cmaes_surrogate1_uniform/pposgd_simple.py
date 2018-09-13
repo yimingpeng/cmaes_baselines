@@ -151,8 +151,7 @@ def add_vtarg_and_adv(segs, gamma, lam):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
     """
-    new = np.append(segs["new"],
-                    0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+    new = np.append(segs["new"],0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
     vpred = np.append(segs["vpred"], segs["nextvpred"])
     T = len(segs["rew"])
     segs["adv"] = gaelam = np.empty(T, 'float32')
