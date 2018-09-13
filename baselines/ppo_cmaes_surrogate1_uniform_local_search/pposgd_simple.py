@@ -419,6 +419,9 @@ def learn(env, policy_fn, *,
                     adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(newlosses)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
+            seg = seg_gen.__next__()
+            add_vtarg_and_adv(seg, gamma, lam)
+            if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
         # rewbuffer.extend(seg["ep_rets"])
         # lenbuffer.extend(seg["ep_lens"])
         if segs is None:
