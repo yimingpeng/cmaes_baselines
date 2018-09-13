@@ -31,8 +31,8 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     env = make_gym_control_env(env_id, seed)
-    test_env = make_gym_control_env(env_id, seed)
-    pposgd_simple.learn(env, test_env, policy_fn,
+    # test_env = make_gym_control_env(env_id, seed)
+    pposgd_simple.learn(env, policy_fn,
                         max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                         popsize = popsize,
                         gensize = gensize,
@@ -48,12 +48,11 @@ def train(env_id, num_timesteps, seed):
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)
     env.close()
-    test_env.close()
 
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+args.seed)
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
