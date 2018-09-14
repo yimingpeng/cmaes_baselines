@@ -27,7 +27,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     ep_lens = []  # lengths of ...
 
     while True:
-        ac, vpred, a_prob = pi.act(stochastic, ob)
+        ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -80,12 +80,12 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
             result_record()
         prevac = ac
-        ac, vpred, a_prob = pi.act(stochastic, ob)
+        ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "a_prob": a_probs, "new": news,
+            yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "new": news,
                    "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
                    "ep_rets": ep_rets, "ep_lens": ep_lens, "traj_index": traj_index}
             # Be careful!!! if you change the downstream algorithm to aggregate
@@ -97,7 +97,6 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         i = t % horizon
         obs[i] = ob
         vpreds[i] = vpred
-        a_probs[i] = a_prob
         news[i] = new
         acs[i] = ac
         prevacs[i] = prevac
