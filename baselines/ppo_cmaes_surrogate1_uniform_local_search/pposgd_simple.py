@@ -404,7 +404,7 @@ def learn(env, policy_fn, *,
             train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
             train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
             train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
-            train_segs["a_prob"] = np.take(segs["a_prob"], selected_train_index, axis = 0)
+            # train_segs["a_prob"] = np.take(segs["a_prob"], selected_train_index, axis = 0)
             train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
             train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
             train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
