@@ -476,80 +476,80 @@ def learn(env, policy_fn, *,
                     adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(newlosses)
                 logger.log(fmt_row(13, np.mean(losses, axis=0)))
-
-        seg = seg_gen.__next__()
-        add_vtarg_and_adv(seg, gamma, lam)
-        if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
-        if segs is None:
-            segs = seg
-        elif len(segs["ob"]) >= 50000:
-            segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
-            segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])),
-                                      axis = 0)
-            segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
-            segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch, len(segs["rew"])), axis = 0)
-            segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch, len(segs["vpred"])), axis = 0)
-            segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch, len(segs["new"])), axis = 0)
-            segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch, len(segs["adv"])), axis = 0)
-            segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])),
-                                       axis = 0)
-            segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])),
-                                      axis = 0)
-            segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])),
-                                      axis = 0)
         else:
-            segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
-            segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
-            segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
-            segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
-            segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
-            segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
-            segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
-            segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
-            segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
-            segs["ep_lens"] = np.append(segs['rew'], seg['ep_lens'], axis = 0)
+            seg = seg_gen.__next__()
+            add_vtarg_and_adv(seg, gamma, lam)
+            if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
+            if segs is None:
+                segs = seg
+            elif len(segs["ob"]) >= 50000:
+                segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
+                segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])),
+                                          axis = 0)
+                segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
+                segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch, len(segs["rew"])), axis = 0)
+                segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch, len(segs["vpred"])), axis = 0)
+                segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch, len(segs["new"])), axis = 0)
+                segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch, len(segs["adv"])), axis = 0)
+                segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])),
+                                           axis = 0)
+                segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])),
+                                          axis = 0)
+                segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])),
+                                          axis = 0)
+            else:
+                segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
+                segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
+                segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
+                segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
+                segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
+                segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
+                segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
+                segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
+                segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
+                segs["ep_lens"] = np.append(segs['rew'], seg['ep_lens'], axis = 0)
 
-        selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
-        train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
-        train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
-        train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
-        train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
-        train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
-        train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
-        train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
-        train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
+                selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
+                train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
+                train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
+                train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
+                train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
+                train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
+                train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
+                train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
+                train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
 
-        new = train_segs["new"]  # last element is only used for last vtarg, but we already zeroed it if last new = 1
-        rew = train_segs["rew"]
-        train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
-        # train_segs["adv"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"]) \
-        #                     - compute_v_pred(train_segs["next_ob"])
+                new = train_segs["new"]  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+                rew = train_segs["rew"]
+                train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
+                # train_segs["adv"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"]) \
+                #                     - compute_v_pred(train_segs["next_ob"])
 
-        ob, ac, reward, v_target = train_segs["ob"], train_segs["ac"], train_segs["rew"], \
-                                   train_segs["v_target"][0]
-        d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
-        optim_batchsize = optim_batchsize or ob.shape[0]
+                ob, ac, reward, v_target = train_segs["ob"], train_segs["ac"], train_segs["rew"], \
+                                           train_segs["v_target"][0]
+                d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
+                optim_batchsize = optim_batchsize or ob.shape[0]
 
-        assign_old_eq_new()  # set old parameter values to new parameter values
-        # Train V function
-        # logger.log("Training V Func and Evaluating V Func Losses")
-        for _ in range(optim_epochs):
-            vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-            for batch in d.iterate_once(optim_batchsize):
-                *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                             cur_lrmult)
-                vf_adam.update(g, optim_stepsize * cur_lrmult)
-                vf_losses.append(vf_loss)
-            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+                assign_old_eq_new()  # set old parameter values to new parameter values
+                # Train V function
+                # logger.log("Training V Func and Evaluating V Func Losses")
+                for _ in range(optim_epochs):
+                    vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+                    for batch in d.iterate_once(optim_batchsize):
+                        *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                                     cur_lrmult)
+                        vf_adam.update(g, optim_stepsize * cur_lrmult)
+                        vf_losses.append(vf_loss)
+                    # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         # Use the sample to train policy
-        new = seg["new"]  # last element is only used for last vtarg, but we already zeroed it if last new = 1
-        rew = seg["rew"]
-        delta = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(seg["next_ob"]) \
-                            - compute_v_pred(seg["ob"])
-        seg["adv"] = delta[0]
-        v_next_pred = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(seg["next_ob"])
-        seg["tdlamret"] = v_next_pred[0]
+        # new = seg["new"]  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+        # rew = seg["rew"]
+        # delta = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(seg["next_ob"]) \
+        #                     - compute_v_pred(seg["ob"])
+        # seg["adv"] = delta[0]
+        # v_next_pred = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(seg["next_ob"])
+        # seg["tdlamret"] = v_next_pred[0]
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
