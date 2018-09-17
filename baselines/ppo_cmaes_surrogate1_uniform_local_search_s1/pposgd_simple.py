@@ -471,22 +471,22 @@ def learn(env, policy_fn, *,
 
             # Train V function
             # logger.log("Training V Func and Evaluating V Func Losses")
-            assign_old_eq_new()  # set old parameter values to new parameter values
-            # Train V function
-            # logger.log("Catchup Training V Func and Evaluating V Func Losses")
-            logger.log("Train V - "+str(_))
-            for _ in range(optim_epochs):
-                vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-                for batch in d.iterate_once(optim_batchsize):
-                    *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                                   cur_lrmult)
-                    vf_adam.update(g, optim_stepsize * cur_lrmult)
-                    vf_losses.append(vf_loss)
-                logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-
-            seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-            seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-            add_vtarg_and_adv(seg, gamma, lam)
+            # assign_old_eq_new()  # set old parameter values to new parameter values
+            # # Train V function
+            # # logger.log("Catchup Training V Func and Evaluating V Func Losses")
+            # # logger.log("Train V - "+str(_))
+            # for _ in range(optim_epochs):
+            #     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+            #     for batch in d.iterate_once(optim_batchsize):
+            #         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+            #                                        cur_lrmult)
+            #         vf_adam.update(g, optim_stepsize * cur_lrmult)
+            #         vf_losses.append(vf_loss)
+            #     logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            #
+            # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+            # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+            # add_vtarg_and_adv(seg, gamma, lam)
 
             # Local search
             for _ in range(optim_epochs):
