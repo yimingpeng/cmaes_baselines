@@ -471,7 +471,6 @@ def learn(env, policy_fn, *,
 
             # Train V function
             logger.log("Training V Func and Evaluating V Func Losses")
-            assign_old_eq_new()  # set old parameter values to new parameter values
             # Train V function
             # logger.log("Catchup Training V Func and Evaluating V Func Losses")
             # logger.log("Train V - "+str(_))
@@ -484,6 +483,7 @@ def learn(env, policy_fn, *,
                     vf_losses.append(vf_loss)
                 logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
+            assign_old_eq_new()  # set old parameter values to new parameter values
             seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
             add_vtarg_and_adv(seg, gamma, lam)
@@ -508,7 +508,7 @@ def learn(env, policy_fn, *,
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
 
-        assign_old_eq_new()  # set old parameter values to new parameter values
+        # assign_old_eq_new()  # set old parameter values to new parameter values
         for i in range(len(layer_var_list)):
             # CMAES Train Policy
             assign_backup_eq_new()  # backup current policy

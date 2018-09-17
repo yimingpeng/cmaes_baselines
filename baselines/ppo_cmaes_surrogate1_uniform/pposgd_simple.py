@@ -486,7 +486,7 @@ def learn(env, policy_fn, *,
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
 
-        assign_old_eq_new()  # set old parameter values to new parameter values
+        # assign_old_eq_new()  # set old parameter values to new parameter values
         for i in range(len(layer_var_list)):
             # CMAES Train Policy
             assign_backup_eq_new()  # backup current policy
