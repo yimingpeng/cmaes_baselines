@@ -489,18 +489,6 @@ def learn(env, policy_fn, *,
             # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
             # add_vtarg_and_adv(seg, gamma, lam)
-
-            ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
-            d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
-            optim_batchsize = optim_batchsize or ob.shape[0]
-            # Local search
-            for _ in range(optim_epochs):
-                losses = []  # list of tuples, each of which gives the loss for a minibatch
-                for batch in d.iterate_once(optim_batchsize):
-                    *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult,
-                                                1.0)
-                    adam.update(g, optim_stepsize * cur_lrmult)
-                    losses.append(newlosses)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
@@ -574,6 +562,19 @@ def learn(env, policy_fn, *,
                 # set_pi_flat_params(best_solution)
             import gc
             gc.collect()
+
+        ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
+        atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
+        d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
+        optim_batchsize = optim_batchsize or ob.shape[0]
+        # Local search
+        for _ in range(optim_epochs):
+            losses = []  # list of tuples, each of which gives the loss for a minibatch
+            for batch in d.iterate_once(optim_batchsize):
+                *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult,
+                                            1.0)
+                adam.update(g, optim_stepsize * cur_lrmult)
+                losses.append(newlosses)
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
