@@ -431,7 +431,7 @@ def learn(env, policy_fn, *,
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     vf_losses.append(vf_loss)
-                # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+                logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
             seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
@@ -477,6 +477,7 @@ def learn(env, policy_fn, *,
                                                        cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)
                         vf_losses.append(vf_loss)
+                    logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
             seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])

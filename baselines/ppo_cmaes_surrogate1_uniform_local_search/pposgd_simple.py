@@ -434,7 +434,7 @@ def learn(env, policy_fn, *,
                                                  cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     vf_losses.append(vf_loss)
-                # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+                logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
             assign_old_eq_new()  # set old parameter values to new parameter values
             # logger.log("Optimizing...")
             # logger.log(fmt_row(13, loss_names))
