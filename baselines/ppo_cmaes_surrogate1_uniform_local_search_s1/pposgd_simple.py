@@ -443,29 +443,29 @@ def learn(env, policy_fn, *,
                     vf_losses.append(vf_loss)
                 logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
         else:
-            # Update v target
-            new = segs["new"]
-            rew = segs["rew"]
-            act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
-            importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
-            segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
-                               np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
-            # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
-
-            # if iters_so_far != 0:
-            # assign_old_eq_new()  # set old parameter values to new parameter values
-            selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
-            train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
-            train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
-            train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
-            train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
-            train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
-            train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
-            train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
-            train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
-            train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
-
-            ob, ac, atarg, v_target = train_segs["ob"], train_segs["ac"], train_segs["adv"], train_segs["v_target"]
+            # # Update v target
+            # new = segs["new"]
+            # rew = segs["rew"]
+            # act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
+            # importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
+            # segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
+            #                    np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
+            # # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
+            #
+            # # if iters_so_far != 0:
+            # # assign_old_eq_new()  # set old parameter values to new parameter values
+            # selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
+            # train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
+            # train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
+            # train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
+            # train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
+            # train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
+            # train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
+            # train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
+            # train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
+            # train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
+            #
+            ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["v_target"]
             d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
