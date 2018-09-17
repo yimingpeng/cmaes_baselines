@@ -21,7 +21,7 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 5
-    gensize = 200 # For each iterations
+    gensize = 100 # For each iterations
     max_v_train_iter = 1
     bounds = [-5.0, 5.0]
     # sigma = 0.02
