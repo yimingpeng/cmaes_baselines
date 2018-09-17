@@ -469,8 +469,8 @@ def learn(env, policy_fn, *,
                 assign_old_eq_new()  # set old parameter values to new parameter values
                 # Train V function
                 # logger.log("Catchup Training V Func and Evaluating V Func Losses")
+                logger.log("Train V - "+str(train_times))
                 for _ in range(optim_epochs):
-                    logger.log("Train V - "+str(train_times))
                     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                     for batch in d.iterate_once(optim_batchsize):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
