@@ -377,7 +377,7 @@ def learn(env, policy_fn, *,
         if segs is None:
             segs = seg
             segs["v_target"] = np.zeros(len(seg["ob"]), 'float32')
-        elif len(segs["ob"]) >= 20000:
+        elif len(segs["ob"]) >= 10000:
             segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
             segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
             segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
@@ -470,6 +470,7 @@ def learn(env, policy_fn, *,
                 # Train V function
                 # logger.log("Catchup Training V Func and Evaluating V Func Losses")
                 for _ in range(optim_epochs):
+                    logger.log("Train V - "+str(train_times))
                     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                     for batch in d.iterate_once(optim_batchsize):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
