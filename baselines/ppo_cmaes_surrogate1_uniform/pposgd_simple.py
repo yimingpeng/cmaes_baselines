@@ -373,26 +373,6 @@ def learn(env, policy_fn, *,
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
-        # Catch up
-        ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
-        d = Dataset(dict(ob = ob, ac = ac, vtarg = tdlamret), shuffle = not pi.recurrent)
-        optim_batchsize = optim_batchsize or ob.shape[0]
-
-        # assign_old_eq_new()  # set old parameter values to new parameter values
-        # # Train V function
-        # # logger.log("Catchup Training V Func and Evaluating V Func Losses")
-        # for _ in range(optim_epochs):
-        #     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-        #     for batch in d.iterate_once(optim_batchsize):
-        #         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-        #                                        cur_lrmult)
-        #         vf_adam.update(g, optim_stepsize * cur_lrmult)
-        #         vf_losses.append(vf_loss)
-        #     # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-        #
-        # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-        # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-        # add_vtarg_and_adv(seg, gamma, lam)
 
         if segs is None:
             segs = seg
@@ -436,52 +416,72 @@ def learn(env, policy_fn, *,
             segs["ep_lens"] = np.append(segs['ep_lens'], seg['ep_lens'], axis = 0)
             segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
 
-        # Update v target
-        new = segs["new"]
-        rew = segs["rew"]
-        act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
-        importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
-        segs["v_target"] = importance_ratio* (1/np.sum(importance_ratio)) * \
-                           np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
-        # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
-
-        # if iters_so_far != 0:
-        # assign_old_eq_new()  # set old parameter values to new parameter values
-        if len(segs["ob"]) >= 20000:
-            train_times = 5
-        else:
-            train_times = 2
-        for _ in range(train_times):
-            selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
-            train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
-            train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
-            train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
-            train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
-            train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
-            train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
-            train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
-            train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
-            train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
-
-            ob, ac, atarg, v_target = train_segs["ob"], train_segs["ac"], train_segs["adv"], train_segs["v_target"]
-            d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
+        if iters_so_far == 0:
+            ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
+            d = Dataset(dict(ob = ob, ac = ac, vtarg = tdlamret), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
+            assign_old_eq_new()  # set old parameter values to new parameter values
             # Train V function
-            # logger.log("Training V Func and Evaluating V Func Losses")
+            # logger.log("Catchup Training V Func and Evaluating V Func Losses")
             for _ in range(optim_epochs):
+                vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
                     *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
+                    vf_losses.append(vf_loss)
+                # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
-        train_segs = None
-        importance_ratio = None
-        import gc
-        gc.collect()
-        seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-        seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-        add_vtarg_and_adv(seg, gamma, lam)
+            seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+            seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+            add_vtarg_and_adv(seg, gamma, lam)
+        else:
+            # Update v target
+            new = segs["new"]
+            rew = segs["rew"]
+            act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
+            importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
+            segs["v_target"] = importance_ratio* (1/np.sum(importance_ratio)) * \
+                               np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
+            # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
+
+            # if iters_so_far != 0:
+            # assign_old_eq_new()  # set old parameter values to new parameter values
+            if len(segs["ob"]) >= 20000:
+                train_times = 5
+            else:
+                train_times = 2
+            for _ in range(train_times):
+                selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
+                train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
+                train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
+                train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
+                train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
+                train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
+                train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
+                train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
+                train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
+                train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
+
+                ob, ac, atarg, v_target = train_segs["ob"], train_segs["ac"], train_segs["adv"], train_segs["v_target"]
+                d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
+                optim_batchsize = optim_batchsize or ob.shape[0]
+
+                # Train V function
+                # logger.log("Training V Func and Evaluating V Func Losses")
+                for _ in range(optim_epochs):
+                    vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+                    for batch in d.iterate_once(optim_batchsize):
+                        *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                                       cur_lrmult)
+                        vf_adam.update(g, optim_stepsize * cur_lrmult)
+                        vf_losses.append(vf_loss)
+
+            seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+            seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+            add_vtarg_and_adv(seg, gamma, lam)
+
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
 
