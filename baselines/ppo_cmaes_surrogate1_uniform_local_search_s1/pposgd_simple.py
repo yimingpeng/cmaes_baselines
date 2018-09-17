@@ -469,6 +469,7 @@ def learn(env, policy_fn, *,
             d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
+            assign_old_eq_new()  # set old parameter values to new parameter values
             # Train V function
             logger.log("Training V Func and Evaluating V Func Losses")
             # Train V function
@@ -483,7 +484,6 @@ def learn(env, policy_fn, *,
                     vf_losses.append(vf_loss)
                 logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
-            assign_old_eq_new()  # set old parameter values to new parameter values
             seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
             add_vtarg_and_adv(seg, gamma, lam)
