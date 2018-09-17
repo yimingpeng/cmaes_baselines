@@ -473,7 +473,7 @@ def learn(env, policy_fn, *,
                 optim_batchsize = optim_batchsize or ob.shape[0]
 
                 # Train V function
-                logger.log("Training V Func and Evaluating V Func Losses")
+                # logger.log("Training V Func and Evaluating V Func Losses")
                 # Train V function
                 # logger.log("Catchup Training V Func and Evaluating V Func Losses")
                 # logger.log("Train V - "+str(_))
