@@ -465,7 +465,7 @@ def learn(env, policy_fn, *,
             # train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
             # train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
             #
-            ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["v_target"]
+            ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
             d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
