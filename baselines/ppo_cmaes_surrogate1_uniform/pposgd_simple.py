@@ -377,19 +377,7 @@ def learn(env, policy_fn, *,
         if segs is None:
             segs = seg
             segs["v_target"] = np.zeros(len(seg["ob"]), 'float32')
-        elif len(segs["ob"]) >= 50000:
-            segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
-            segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
-            segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
-            segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
-            segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
-            segs["act_props"] = np.append(segs['act_props'], seg['act_props'], axis = 0)
-            segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
-            segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
-            segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
-            segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
-            segs["ep_lens"] = np.append(segs['ep_lens'], seg['ep_lens'], axis = 0)
-            segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
+        elif len(segs["ob"]) >= 20000:
             segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
             segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
             segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
@@ -402,6 +390,18 @@ def learn(env, policy_fn, *,
             segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])), axis = 0)
             segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])), axis = 0)
             segs["v_target"] = np.take(segs["v_target"], np.arange(timesteps_per_actorbatch, len(segs["v_target"])), axis = 0)
+            segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
+            segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
+            segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
+            segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
+            segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
+            segs["act_props"] = np.append(segs['act_props'], seg['act_props'], axis = 0)
+            segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
+            segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
+            segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
+            segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
+            segs["ep_lens"] = np.append(segs['ep_lens'], seg['ep_lens'], axis = 0)
+            segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
         else:
             segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
             segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
@@ -432,23 +432,19 @@ def learn(env, policy_fn, *,
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                     vf_losses.append(vf_loss)
                 logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-
-            seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-            seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-            add_vtarg_and_adv(seg, gamma, lam)
         else:
             # Update v target
             new = segs["new"]
             rew = segs["rew"]
             act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
             importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
-            segs["v_target"] = importance_ratio* (1/np.sum(importance_ratio)) * \
+            segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
                                np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
 
             # if iters_so_far != 0:
             # assign_old_eq_new()  # set old parameter values to new parameter values
-            if len(segs["ob"]) >= 20000:
+            if len(segs["ob"]) >= 10000:
                 train_times = 5
             else:
                 train_times = 2
@@ -470,6 +466,9 @@ def learn(env, policy_fn, *,
 
                 # Train V function
                 # logger.log("Training V Func and Evaluating V Func Losses")
+                assign_old_eq_new()  # set old parameter values to new parameter values
+                # Train V function
+                # logger.log("Catchup Training V Func and Evaluating V Func Losses")
                 for _ in range(optim_epochs):
                     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                     for batch in d.iterate_once(optim_batchsize):
@@ -479,9 +478,9 @@ def learn(env, policy_fn, *,
                         vf_losses.append(vf_loss)
                     logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
-            seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-            seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-            add_vtarg_and_adv(seg, gamma, lam)
+        seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+        seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+        add_vtarg_and_adv(seg, gamma, lam)
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
