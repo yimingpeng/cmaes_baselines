@@ -238,7 +238,7 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
@@ -528,14 +528,69 @@ def learn(env, policy_fn, *,
             import gc
             gc.collect()
 
-        # Value function catch up
+        seg = seg_gen.__next__()
+        add_vtarg_and_adv(seg, gamma, lam)
+        if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
+        assign_old_eq_new()  # set old parameter values to new parameter values
+        # Value function catch up
+        assign_old_eq_new()  # set old parameter values to new parameter values
+        if segs is None:
+            segs = seg
+            segs["v_target"] = np.zeros(len(seg["ob"]), 'float32')
+        elif len(segs["ob"]) >= 50000:
+            segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
+            segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
+            segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
+            segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch, len(segs["rew"])), axis = 0)
+            segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch, len(segs["vpred"])), axis = 0)
+            segs["act_props"] = np.take(segs["act_props"], np.arange(timesteps_per_actorbatch, len(segs["act_props"])), axis = 0)
+            segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch, len(segs["new"])), axis = 0)
+            segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch, len(segs["adv"])), axis = 0)
+            segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])), axis = 0)
+            segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])), axis = 0)
+            segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])), axis = 0)
+            segs["v_target"] = np.take(segs["v_target"], np.arange(timesteps_per_actorbatch, len(segs["v_target"])), axis = 0)
+            segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
+            segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
+            segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
+            segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
+            segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
+            segs["act_props"] = np.append(segs['act_props'], seg['act_props'], axis = 0)
+            segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
+            segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
+            segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
+            segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
+            segs["ep_lens"] = np.append(segs['ep_lens'], seg['ep_lens'], axis = 0)
+            segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
+        else:
+            segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
+            segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
+            segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
+            segs["rew"] = np.append(segs['rew'], seg['rew'], axis = 0)
+            segs["vpred"] = np.append(segs['vpred'], seg['vpred'], axis = 0)
+            segs["act_props"] = np.append(segs['act_props'], seg['act_props'], axis = 0)
+            segs["new"] = np.append(segs['new'], seg['new'], axis = 0)
+            segs["adv"] = np.append(segs['adv'], seg['adv'], axis = 0)
+            segs["tdlamret"] = np.append(segs['tdlamret'], seg['tdlamret'], axis = 0)
+            segs["ep_rets"] = np.append(segs['ep_rets'], seg['ep_rets'], axis = 0)
+            segs["ep_lens"] = np.append(segs['ep_lens'], seg['ep_lens'], axis = 0)
+            segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
 
         # local search
         ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
         d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
         optim_batchsize = optim_batchsize or ob.shape[0]
+
+        # Catch up V function
+        for _ in range(optim_epochs):
+            for batch in d.iterate_once(optim_batchsize):
+                *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                               cur_lrmult)
+                vf_adam.update(g, optim_stepsize * cur_lrmult)
+            # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+
         # Local search
         for _ in range(optim_epochs):
             for batch in d.iterate_once(optim_batchsize):
