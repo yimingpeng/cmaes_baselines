@@ -353,14 +353,14 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / 0.5 * max_timesteps, 0)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
 
         else:
             raise NotImplementedError
 
-        epsilon = max(0.5 - float(timesteps_so_far)  / 0.5 * max_timesteps, 0) * cur_lrmult
+        epsilon = max(0.5 - float(timesteps_so_far) * 10  / max_timesteps, 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) / 0.5 * max_timesteps, 1e-8)
+        sigma_adapted = max(sigma - float(timesteps_so_far) * 10 / max_timesteps, 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
