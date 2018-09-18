@@ -442,34 +442,29 @@ def learn(env, policy_fn, *,
                                np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
 
-            if len(segs["ob"]) >= 20000:
-                train_times = 5
-            else:
-                train_times = 2
-            for _ in range(train_times):
-                selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
-                train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
-                train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
-                train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
-                train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
-                train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
-                train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
-                train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
-                train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
-                train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
+            selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
+            train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
+            train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
+            train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
+            train_segs["rew"] = np.take(segs["rew"], selected_train_index, axis = 0)
+            train_segs["vpred"] = np.take(segs["vpred"], selected_train_index, axis = 0)
+            train_segs["new"] = np.take(segs["new"], selected_train_index, axis = 0)
+            train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
+            train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
+            train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
 
-                ob, ac, atarg, v_target = train_segs["ob"], train_segs["ac"], train_segs["adv"], train_segs["v_target"]
-                d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
-                optim_batchsize = optim_batchsize or ob.shape[0]
+            ob, ac, atarg, v_target = train_segs["ob"], train_segs["ac"], train_segs["adv"], train_segs["v_target"]
+            d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
+            optim_batchsize = optim_batchsize or ob.shape[0]
 
-                for _ in range(optim_epochs):
-                    vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-                    for batch in d.iterate_once(optim_batchsize):
-                        *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                                       cur_lrmult)
-                        vf_adam.update(g, optim_stepsize * cur_lrmult)
-                        vf_losses.append(vf_loss)
-                    # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+            for _ in range(optim_epochs):
+                vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
+                for batch in d.iterate_once(optim_batchsize):
+                    *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                                   cur_lrmult)
+                    vf_adam.update(g, optim_stepsize * cur_lrmult)
+                    vf_losses.append(vf_loss)
+                # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
         # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
         # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
