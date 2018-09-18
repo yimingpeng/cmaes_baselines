@@ -368,9 +368,9 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(0.5 - float(timesteps_so_far) * 10 / max_timesteps, 0) * cur_lrmult
+        epsilon = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) * 10 / max_timesteps, 1e-8)
+        sigma_adapted = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8) * cur_lrmult
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
@@ -441,6 +441,7 @@ def learn(env, policy_fn, *,
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                 # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
         else:
+
             # Update v target
             new = segs["new"]
             rew = segs["rew"]
@@ -449,8 +450,11 @@ def learn(env, policy_fn, *,
             segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
                                np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
-
-            for i in range(5):
+            if len(segs["ob"]) >= 20000:
+                train_times = 5
+            else:
+                train_times = 2
+            for i in range(train_times):
                 selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
                 train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
                 train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
