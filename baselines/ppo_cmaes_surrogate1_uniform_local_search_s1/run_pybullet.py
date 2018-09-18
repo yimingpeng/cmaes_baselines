@@ -24,7 +24,7 @@ def train(env_id, num_timesteps, seed):
     gensize =50 # For each iterations
     max_v_train_iter = 1
     bounds = [-5.0, 5.0]
-    sigma = 0.001
+    sigma = 0.02
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform_local_search_s1 import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
