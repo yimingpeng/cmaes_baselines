@@ -25,9 +25,8 @@ def train(env_id, num_timesteps, seed):
     max_v_train_iter = 1
     bounds = [-5.0, 5.0]
     sigma = 0.002
-    # sigma = 3e-4
     eval_iters = 1
-    from baselines.ppo_cmaes_surrogate1_uniform_new import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate1_uniform_local_search_s1_new import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
@@ -58,7 +57,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-S1"+args.env+"_seed_"+str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

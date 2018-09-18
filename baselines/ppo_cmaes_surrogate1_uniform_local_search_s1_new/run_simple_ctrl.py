@@ -22,7 +22,7 @@ def train(env_id, num_timesteps, seed):
     bounds = [-5.0, 5.0]
     sigma = 0.02
     eval_iters = 1
-    from baselines.ppo_cmaes_surrogate1_uniform_new import mlp_policy, pposgd_simple
+    from baselines.ppo_cmaes_surrogate1_uniform_local_search_s1_new import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
 
     def policy_fn(name, ob_space, ac_space):
@@ -31,6 +31,7 @@ def train(env_id, num_timesteps, seed):
                                     hid_size=64, num_hid_layers=2)
 
     env = make_gym_control_env(env_id, seed)
+    # test_env = make_gym_control_env(env_id, seed)
     pposgd_simple.learn(env, policy_fn,
                         max_fitness = max_fitness,  # has to be negative, as cmaes consider minization
                         popsize = popsize,
@@ -42,7 +43,7 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=5, optim_stepsize=3e-4,
+                        optim_epochs=5, optim_stepsize=3e-5,
                         optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)
@@ -51,7 +52,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-S1"+args.env+"_seed_"+str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
