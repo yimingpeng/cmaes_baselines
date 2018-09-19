@@ -329,9 +329,9 @@ def learn(env, policy_fn, *,
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
     # opt['seed'] = seed
-    opt['AdaptSigma'] = False
-    opt['bounds'] = bounds
-    opt['tolstagnation'] = 20
+    opt['AdaptSigma'] = True
+    # opt['bounds'] = bounds
+    # opt['tolstagnation'] = 20
     ess = []
     seg = None
     segs = None
@@ -507,8 +507,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                solutions = es.ask()
+                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                # solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
