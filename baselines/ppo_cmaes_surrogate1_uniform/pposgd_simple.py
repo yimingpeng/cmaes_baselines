@@ -443,9 +443,9 @@ def learn(env, policy_fn, *,
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
 
             if len(segs["ob"]) >= 20000:
-                train_times = 1
+                train_times = 5
             else:
-                train_times = 1
+                train_times = 2
             for i in range(train_times):
                 selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
                 train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
@@ -471,9 +471,9 @@ def learn(env, policy_fn, *,
                         vf_losses.append(vf_loss)
                     # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
 
-        seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-        seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-        add_vtarg_and_adv(seg, gamma, lam)
+        # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+        # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+        # add_vtarg_and_adv(seg, gamma, lam)
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
