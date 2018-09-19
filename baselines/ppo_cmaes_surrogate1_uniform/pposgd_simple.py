@@ -329,9 +329,9 @@ def learn(env, policy_fn, *,
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
     # opt['seed'] = seed
-    opt['AdaptSigma'] = True
-    # opt['bounds'] = bounds
-    # opt['tolstagnation'] = 20
+    opt['AdaptSigma'] = False
+    opt['bounds'] = bounds
+    opt['tolstagnation'] = 20
     ess = []
     seg = None
     segs = None
@@ -353,7 +353,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 0)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.25 * max_timesteps), 1e-8)
 
         else:
             raise NotImplementedError
@@ -443,9 +443,9 @@ def learn(env, policy_fn, *,
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
 
             if len(segs["ob"]) >= 20000:
-                train_times = 5
+                train_times = 1
             else:
-                train_times = 2
+                train_times = 1
             for i in range(train_times):
                 selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
                 train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
