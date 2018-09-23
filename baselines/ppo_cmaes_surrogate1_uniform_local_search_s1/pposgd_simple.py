@@ -368,7 +368,7 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
+        epsilon = max(1.0 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(sigma - float(timesteps_so_far) / (15000 * max_timesteps), 1e-8) * cur_lrmult
         logger.log("********** Iteration %i ************" % iters_so_far)
@@ -481,9 +481,9 @@ def learn(env, policy_fn, *,
                                                        cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)
                     # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
-                seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-                seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-                add_vtarg_and_adv(seg, gamma, lam)
+                # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+                # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+                # add_vtarg_and_adv(seg, gamma, lam)
 
 
             ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
@@ -502,9 +502,9 @@ def learn(env, policy_fn, *,
             # add_vtarg_and_adv(seg, gamma, lam)
 
 
-        seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-        seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-        add_vtarg_and_adv(seg, gamma, lam)
+        # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+        # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+        # add_vtarg_and_adv(seg, gamma, lam)
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
