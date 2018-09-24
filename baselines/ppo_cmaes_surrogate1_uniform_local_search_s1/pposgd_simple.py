@@ -371,6 +371,7 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0), 1e-8)
+        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
@@ -509,6 +510,7 @@ def learn(env, policy_fn, *,
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
 
+        opt['CMA_cmean'] = cmean_adapted
         # assign_old_eq_new()  # set old parameter values to new parameter values
         for i in range(len(layer_var_list)):
             # CMAES Train Policy
