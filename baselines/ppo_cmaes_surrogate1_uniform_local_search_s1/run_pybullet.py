@@ -46,7 +46,7 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=2, optim_stepsize=3e-5,
+                        optim_epochs=3, optim_stepsize=3e-5,
                         optim_batchsize=64,
                         gamma=0.999, lam=0.95, schedule='linear',
                         seed=seed,
