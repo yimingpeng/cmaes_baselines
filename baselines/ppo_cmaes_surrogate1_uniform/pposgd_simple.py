@@ -358,9 +358,9 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(1.0 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
+        epsilon = max(0.5- float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) / (15000 * max_timesteps), 1e-8) * cur_lrmult
+        sigma_adapted = max(sigma - float(timesteps_so_far) / (15000 * max_timesteps), 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])

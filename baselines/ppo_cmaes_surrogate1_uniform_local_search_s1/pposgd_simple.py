@@ -339,7 +339,7 @@ def learn(env, policy_fn, *,
     opt['verb_disp'] = 0
     opt['verb_log'] = 0
     # opt['seed'] = seed
-    opt['AdaptSigma'] = True
+    opt['AdaptSigma'] = False
     # opt['bounds'] = bounds
     # opt['tolstagnation'] = 20
     ess = []
@@ -368,9 +368,9 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        epsilon = max(1.0 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
+        epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(sigma - float(timesteps_so_far) / (15000 * max_timesteps), 1e-8) * cur_lrmult
+        sigma_adapted = max(sigma - float(timesteps_so_far) / (15000 * max_timesteps), 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
@@ -538,7 +538,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
