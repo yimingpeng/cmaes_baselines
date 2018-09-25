@@ -358,7 +358,7 @@ def learn(env, policy_fn, *,
 
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
-        sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0), 1e-8)
+        sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
         cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
