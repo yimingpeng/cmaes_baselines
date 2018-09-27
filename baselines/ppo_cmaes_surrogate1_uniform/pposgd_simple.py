@@ -359,7 +359,7 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
+        cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps) * cur_lrmult, 1e-8)
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
@@ -425,7 +425,7 @@ def learn(env, policy_fn, *,
 
             # Train V function
             # logger.log("Catchup Training V Func and Evaluating V Func Losses")
-            for _ in range(optim_epochs):
+            for _ in range(max_v_train_iter):
                 vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
                     *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
@@ -463,9 +463,9 @@ def learn(env, policy_fn, *,
                 d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
                 optim_batchsize = optim_batchsize or ob.shape[0]
 
-                for _ in range(optim_epochs):
+                for _ in range(max_v_train_iter):
                     vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-                    for batch in d.iterate_once(optim_batchsize):
+                    for batch in d.iterate_once(max_v_train_iter):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                        cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)

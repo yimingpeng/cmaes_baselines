@@ -438,7 +438,7 @@ def learn(env, policy_fn, *,
 
             # Train V function
             # logger.log("Catchup Training V Func and Evaluating V Func Losses")
-            for _ in range(optim_epochs):
+            for _ in range(max_v_train_iter):
                 for batch in d.iterate_once(optim_batchsize):
                     *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                    cur_lrmult)
@@ -479,7 +479,7 @@ def learn(env, policy_fn, *,
                 # Train V function
                 # logger.log("Catchup Training V Func and Evaluating V Func Losses")
                 # logger.log("Train V - "+str(_))
-                for _ in range(optim_epochs):
+                for _ in range(max_v_train_iter):
                     for batch in d.iterate_once(optim_batchsize):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                        cur_lrmult)
