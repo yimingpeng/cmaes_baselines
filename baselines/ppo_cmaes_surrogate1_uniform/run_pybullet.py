@@ -25,7 +25,7 @@ def train(env_id, num_timesteps, seed):
     max_v_train_iter = 10
     bounds = [-5.0, 5.0]
     # sigma = 0.001
-    sigma = 5e-4
+    sigma = 3e-4
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
