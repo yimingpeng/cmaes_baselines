@@ -27,7 +27,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     ep_lens = []  # lengths of ...
 
     while True:
-        ac, vpred, act_prop = pi.act(stochastic, ob)
+        ac, vpred, a_prop = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -85,7 +85,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "act_props": act_props,"new": news,
+            yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "act_props": act_props, "new": news,
                    "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
                    "ep_rets": ep_rets, "ep_lens": ep_lens, "traj_index": traj_index}
             # Be careful!!! if you change the downstream algorithm to aggregate
@@ -153,7 +153,8 @@ def add_vtarg_and_adv(segs, gamma, lam):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
     """
-    new = np.append(segs["new"],0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+    new = np.append(segs["new"],
+                    0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
     vpred = np.append(segs["vpred"], segs["nextvpred"])
     T = len(segs["rew"])
     segs["adv"] = gaelam = np.empty(T, 'float32')
@@ -217,7 +218,7 @@ def learn(env, policy_fn, *,
                             shape = [])  # learning rate multiplier, updated with schedule
 
     layer_clip = tf.placeholder(name = 'layer_clip', dtype = tf.float32,
-                            shape = [])  # learning rate multiplier, updated with schedule
+                                shape = [])  # learning rate multiplier, updated with schedule
 
     bound_coeff = tf.placeholder(name = 'bound_coeff', dtype = tf.float32,
                                  shape = [])  # learning rate multiplier, updated with schedule
@@ -237,11 +238,12 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
     pol_loss = pol_surr + pol_entpen
+    total_loss = pol_surr + pol_entpen + vf_loss
     losses = [pol_surr, pol_entpen, vf_loss, meankl, meanent]
     loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
 
@@ -264,7 +266,11 @@ def learn(env, policy_fn, *,
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
 
+    lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
+                             losses + [U.flatgrad(total_loss, var_list)])
+
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
+    adam = MpiAdam(var_list, epsilon = adam_epsilon)
 
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
                                                       for (oldv, newv) in zipsame(
@@ -277,9 +283,11 @@ def learn(env, policy_fn, *,
             pi.get_variables(), backup_pi.get_variables())])
     # Compute all losses
 
-    compute_v_pred = U.function([ob], [pi.vpred])
     compute_pol_losses = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
                                     [pol_loss, pol_surr, pol_entpen, meankl])
+
+    compute_v_pred = U.function([ob], [pi.vpred])
+
     a_prob = tf.exp(pi.pd.logp(ac))
     compute_a_prob = U.function([ob, ac], [a_prob])
 
@@ -297,6 +305,8 @@ def learn(env, policy_fn, *,
     # set_pi_layer_flat_params = U.SetFromFlat(pol_var_list)
 
     vf_adam.sync()
+
+    adam.sync()
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, tstart, ppo_timesteps_so_far, best_fitness
@@ -321,6 +331,7 @@ def learn(env, policy_fn, *,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     indices = []  # maintain all selected indices for each iteration
+
     opt = cma.CMAOptions()
     opt['tolfun'] = max_fitness
     opt['popsize'] = popsize
@@ -353,6 +364,7 @@ def learn(env, policy_fn, *,
             cur_lrmult = 1.0
         elif schedule == 'linear':
             cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8)
+
         else:
             raise NotImplementedError
 
@@ -360,6 +372,7 @@ def learn(env, policy_fn, *,
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
         cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
+        # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
         eval_seg = eval_seq.__next__()
@@ -376,6 +389,7 @@ def learn(env, policy_fn, *,
 
         rewbuffer.extend(seg["ep_rets"])
         lenbuffer.extend(seg["ep_lens"])
+
         assign_old_eq_new()  # set old parameter values to new parameter values
         if segs is None:
             segs = seg
@@ -420,21 +434,20 @@ def learn(env, policy_fn, *,
             segs["v_target"] = np.append(segs['v_target'], np.zeros(len(seg["ob"]), 'float32'), axis = 0)
 
         if iters_so_far == 0:
-            ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
+            ob, ac, tdlamret = seg["ob"], seg["ac"], seg["tdlamret"]
             d = Dataset(dict(ob = ob, ac = ac, vtarg = tdlamret), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
 
             # Train V function
             # logger.log("Catchup Training V Func and Evaluating V Func Losses")
             for _ in range(max_v_train_iter):
-                vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
                     *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                    cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
-                    vf_losses.append(vf_loss)
                 # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
         else:
+
             # Update v target
             new = segs["new"]
             rew = segs["rew"]
@@ -443,7 +456,6 @@ def learn(env, policy_fn, *,
             segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
                                np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
-
             if len(segs["ob"]) >= 20000:
                 train_times = int(max_v_train_iter / 2) if int(max_v_train_iter / 2) > 0 else 1
             else:
@@ -459,19 +471,31 @@ def learn(env, policy_fn, *,
                 train_segs["adv"] = np.take(segs["adv"], selected_train_index, axis = 0)
                 train_segs["tdlamret"] = np.take(segs["tdlamret"], selected_train_index, axis = 0)
                 train_segs["v_target"] = np.take(segs["v_target"], selected_train_index, axis = 0)
-
+                #
                 ob, ac, v_target = train_segs["ob"], train_segs["ac"], train_segs["v_target"]
                 d = Dataset(dict(ob = ob, ac = ac, vtarg = v_target), shuffle = not pi.recurrent)
                 optim_batchsize = optim_batchsize or ob.shape[0]
 
+                # Train V function
+                # logger.log("Training V Func and Evaluating V Func Losses")
+                # Train V function
+                # logger.log("Catchup Training V Func and Evaluating V Func Losses")
+                # logger.log("Train V - "+str(_))
                 for _ in range(max_v_train_iter):
-                    vf_losses = []  # list of tuples, each of which gives the loss for a minibatch
-                    for batch in d.iterate_once(max_v_train_iter):
+                    for batch in d.iterate_once(optim_batchsize):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
                                                        cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)
-                        vf_losses.append(vf_loss)
                     # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
+                # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+                # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+                # add_vtarg_and_adv(seg, gamma, lam)
+
+
+            # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
+            # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
+            # add_vtarg_and_adv(seg, gamma, lam)
+
 
         # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
         # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
@@ -521,7 +545,8 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1/3 * (i+1))
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 3 * (i + 1))
+                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
@@ -529,12 +554,11 @@ def learn(env, policy_fn, *,
                 costs += l2_decay
                 costs, real_costs = fitness_rank(costs)
                 # logger.log("real_costs:"+str(real_costs))
-                # best_solution = np.array(solutions[np.argmin(costs)])
-                # best_fitness = -real_costs[np.argmin(costs)]
-                # np.put(flatten_weights, selected_index, best_solution)
-                # layer_set_operate_list[i](flatten_weights)
-                # logger.log("Update the layer")
+                # best_solution = np.copy(es.result[0])
+                # best_fitness = -es.result[1]
                 es.tell_real_seg(solutions = solutions, function_values = costs, real_f = real_costs, segs = None)
+                # best_solution = np.copy(solutions[np.argmin(costs)])
+                # best_fitness = -real_costs[np.argmin(costs)]
                 best_solution = es.result[0]
                 best_fitness = es.result[1]
                 np.put(flatten_weights, selected_index, best_solution)
@@ -544,11 +568,9 @@ def learn(env, policy_fn, *,
                 # best_fitness = es.result[1]
                 # logger.log("Best Solution Fitness:" + str(best_fitness))
                 # set_pi_flat_params(best_solution)
-                # best_solution = np.copy(es.result[0])
-                # best_fitness = -es.result[1]
-            es = None
             import gc
             gc.collect()
+
         iters_so_far += 1
         episodes_so_far += sum(lens)
 
