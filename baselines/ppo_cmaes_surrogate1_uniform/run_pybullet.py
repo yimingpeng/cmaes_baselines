@@ -24,7 +24,6 @@ def train(env_id, num_timesteps, seed):
     gensize = 100 # For each iterations
     max_v_train_iter = 10
     bounds = [-5.0, 5.0]
-    # sigma = 0.001
     sigma = 3e-4
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform import mlp_policy, pposgd_simple
@@ -58,7 +57,7 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-S1"+args.env+"_seed_"+str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
