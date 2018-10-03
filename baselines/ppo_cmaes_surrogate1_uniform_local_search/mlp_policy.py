@@ -47,13 +47,13 @@ class MlpPolicy(object):
         self.state_in = []
         self.state_out = []
 
-        stochastic = tf.placeholder(dtype=tf.bool, shape=())
+        stochastic = tf.placeholder(dtype = tf.bool, shape = ())
         ac = U.switch(stochastic, self.pd.sample(), self.pd.mode())
-        self._act = U.function([stochastic, ob], [ac, self.vpred])
+        self._act = U.function([stochastic, ob], [ac, self.vpred, tf.exp(self.pd.logp(ac))])
 
     def act(self, stochastic, ob):
-        ac1, vpred1 = self._act(stochastic, ob[None])
-        return ac1[0], vpred1[0]
+        ac1, vpred1,act_prop = self._act(stochastic, ob[None])
+        return ac1[0], vpred1[0], act_prop[0]
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):
