@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=1  # number of cores per task (e.g. OpenMP)
 #SBATCH --partition=long        # specify a partition
 #SBATCH --hint=nomultithread    # don't use hyperthreading
-#SBATCH --array=1-10     # Array definition
+#SBATCH --array=1-5     # Array definition
 #SBATCH --error=%A_%a.err
 #SBATCH --output=%A_%a.out
 
