@@ -46,9 +46,9 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=5, optim_stepsize=1e-4,
+                        optim_epochs=5, optim_stepsize=3e-4,
                         optim_batchsize=64,
-                        gamma=0.999, lam=0.95, schedule='linear',
+                        gamma=0.99, lam=0.95, schedule='linear',
                         seed=seed,
                         env_id=env_id)
     env.close()
@@ -57,7 +57,8 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-S1"+args.env+"_seed_"+str(args.seed))
+    logger.log("Algorithm: PES-S1"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
