@@ -16,11 +16,11 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 10
-    gensize = 50 # For each iterations
-    max_v_train_iter = 1
+    popsize = 5
+    gensize = 100 # For each iterations
+    max_v_train_iter = 10
     bounds = [-5.0, 5.0]
-    sigma = 0.02
+    sigma = 3e-4
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform_local_search import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
@@ -43,7 +43,7 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=5, optim_stepsize=3e-5,
+                        optim_epochs=5, optim_stepsize=3e-4,
                         optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear', seed=seed,
                         env_id=env_id)
@@ -52,7 +52,8 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES"+args.env+"_seed_"+str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-"+args.env+"_seed_"+str(args.seed))
+    logger.log("Algorithm: PES-" + args.env + "_seed_" + str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

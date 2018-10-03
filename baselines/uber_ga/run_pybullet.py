@@ -22,10 +22,10 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 129
-    gensize = 2000
-    truncation_size = 5
-    sigma = 0.01
-    eval_iters = 3
+    gensize = 10000
+    truncation_size = 20
+    sigma = 0.002
+    eval_iters = 1
     from baselines.uber_ga import mlp_policy, ga_simple
     U.make_session(num_cpu=1).__enter__()
 

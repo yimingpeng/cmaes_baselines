@@ -128,8 +128,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart,best_fitness
-    if best_fitness != -np.inf:
-        rewbuffer.append(best_fitness)
+    # if best_fitness != -np.inf:
+    #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -210,6 +210,7 @@ def learn(base_env,
     indv_len = len(flatten_weights)
     pop = {}
     pop["solutions"] = np.random.randn(popsize, indv_len)
+    pop["parents"] = pop["solutions"][:, truncation_size]
     pop["fitness"] = np.empty([popsize, 1], dtype = float)
     gen_counter = 0
     while True:
@@ -247,8 +248,8 @@ def learn(base_env,
                 pop["fitness"][i] = np.mean(seg["ep_rets"])
             else:
                 if i != 0:
-                    k = np.random.choice(truncation_size, 1)
-                    pop["solutions"][i] = pop["solutions"][k] + sigma * np.random.randn(1, indv_len)
+                    k = np.random.randint(truncation_size)
+                    pop["solutions"][i] = pop["parents"][k] + sigma * np.random.randn(1, indv_len)
                     pi_set_from_flat_params(pop["solutions"][i])
                     seg = actors[i].__next__()
                     pop["fitness"][i] = np.mean(seg["ep_rets"])
@@ -260,10 +261,12 @@ def learn(base_env,
             assign_new_eq_backup()
         fit_idx = pop["fitness"].flatten().argsort()[::-1][:popsize]
         pop["solutions"] = pop["solutions"][fit_idx]
-        pop["fitness"], real_fitness = fitness_normalization(pop["fitness"][fit_idx])
-
+        pop["parents"] = pop["solutions"][:, truncation_size]
+        pop["fitness"] = pop["fitness"][fit_idx]
+        print(pop["fitness"])
+        # pop["fitness"], real_fitness = fitness_normalization(pop["fitness"][fit_idx])
         logger.log("Generation:", gen_counter)
-        logger.log("Best Solution Fitness:", real_fitness[0])
+        logger.log("Best Solution Fitness:", pop["fitness"][0])
         pi_set_from_flat_params(pop["solutions"][0])
 
         ob = ob_segs["ob"]
@@ -271,7 +274,7 @@ def learn(base_env,
 
         gen_counter += 1
         iters_so_far += 1
-        if sigma >= 0.001:
+        if sigma >= 1e-8:
             sigma *= 0.999
 
 def compute_weight_decay(weight_decay, model_param_list):
