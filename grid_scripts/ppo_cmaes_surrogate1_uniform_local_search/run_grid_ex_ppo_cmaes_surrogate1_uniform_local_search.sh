@@ -9,15 +9,16 @@ cd /vol/grid-solar/sgeusers/yimingpeng/cmaes_baselines/grid_scripts/ppo_cmaes_su
 
 # setting the grid env
 need sgegrid
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_HalfCheetah.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_Hopper.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedDoublePendulum.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulum.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulumSwingup.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_Walker2D.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_BipedalWalker.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_BipedalWalkerHardcore.sh
-qsub -t 1-2:1 ppo_cmaes_surrogate1_uniform_local_search_LunarLanderContinuous.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_HalfCheetah.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_Hopper.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedDoublePendulum.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulum.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulumSwingup.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_Reacher.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_Walker2D.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_BipedalWalker.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_BipedalWalkerHardcore.sh
+qsub -t 1-5:1 ppo_cmaes_surrogate1_uniform_local_search_LunarLanderContinuous.sh
 
 
 
