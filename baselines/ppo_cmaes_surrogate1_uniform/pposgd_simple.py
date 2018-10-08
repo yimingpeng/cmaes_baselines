@@ -363,7 +363,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / max_timesteps, 1e-8)
 
         else:
             raise NotImplementedError
@@ -371,7 +371,7 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (2*max_timesteps), 1e-12)
+        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-12)
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
@@ -534,8 +534,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                # solutions = es.ask()
+                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
