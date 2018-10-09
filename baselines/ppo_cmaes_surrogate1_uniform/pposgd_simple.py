@@ -40,6 +40,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ep_lens = []
 
         ob, rew, new, _ = env.step(ac)
+        rew = np.clip(rew, -1., 1.)
 
         cur_ep_ret += rew
         cur_ep_len += 1
@@ -105,6 +106,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         prevacs[i] = prevac
 
         ob, rew, new, _ = env.step(ac)
+        rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
 
@@ -325,7 +327,7 @@ def learn(env, policy_fn, *,
 
     eval_seq = traj_segment_generator_eval(pi, env,
                                            timesteps_per_actorbatch,
-                                           stochastic = True)
+                                           stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
