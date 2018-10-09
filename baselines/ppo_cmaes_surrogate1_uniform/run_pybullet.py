@@ -21,10 +21,10 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 5
-    gensize = 150 # For each iterations
+    gensize = 100 # For each iterations
     max_v_train_iter = 10
     bounds = [-5.0, 5.0]
-    sigma = 5e-5
+    sigma = 3e-4
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform import mlp_policy, pposgd_simple
     U.make_session(num_cpu=1).__enter__()
@@ -46,7 +46,7 @@ def train(env_id, num_timesteps, seed):
                         max_timesteps=num_timesteps,
                         timesteps_per_actorbatch=2048,
                         clip_param=0.2, entcoeff=0.0,
-                        optim_epochs=5, optim_stepsize=1e-4,
+                        optim_epochs=5, optim_stepsize=3e-4,
                         optim_batchsize=64,
                         gamma=0.99, lam=0.95, schedule='linear',
                         seed=seed,

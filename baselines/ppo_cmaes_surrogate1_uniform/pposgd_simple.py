@@ -28,6 +28,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
 
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
+        ac = np.clip(ac, -1., 1.)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -81,6 +82,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
+        ac = np.clip(ac, -1., 1.)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
