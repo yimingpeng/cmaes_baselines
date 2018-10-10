@@ -81,8 +81,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            record = True
-            # result_record()
+            # record = True
+            result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
