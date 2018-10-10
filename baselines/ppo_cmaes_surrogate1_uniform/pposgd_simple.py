@@ -112,8 +112,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 
         ob, rew, new, _ = env.step(ac)
         original_rew = rew
-        normalizer.update(rew)
-        rew = normalizer.normalize(rew)
+        # normalizer.update(rew)
+        # rew = normalizer.normalize(rew)
         # rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
@@ -257,7 +257,7 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = 0.1*tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
