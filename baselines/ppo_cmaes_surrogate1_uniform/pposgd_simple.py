@@ -53,7 +53,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
+def traj_segment_generator(pi, env, horizon, stochastic):
     # Trajectories generators
     global timesteps_so_far
     t = 0
@@ -77,11 +77,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
     prevacs = acs.copy()
     traj_index = []
     index_count = 0
-    record = False
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            # record = True
             result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
@@ -121,13 +119,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
             traj_index.append(index_count)
             cur_ep_ret = 0
             cur_ep_len = 0
-            # ob = env.reset()
-            # if record:
-            #     eval_seg = eval_seq.__next__()
-            #     rewbuffer.extend(eval_seg["ep_rets"])
-            #     lenbuffer.extend(eval_seg["ep_lens"])
-            #     result_record()
-            #     record = False
             ob = env.reset()
         t += 1
         index_count += 1
@@ -136,7 +127,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart, best_fitness
-    print(rewbuffer)
+    # print(rewbuffer)
     # if best_fitness != -np.inf:
     #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
@@ -190,7 +181,7 @@ def uniform_select(weights, proportion):
     return index, np.take(weights, index, axis = 0)
 
 
-def learn(env, test_env, policy_fn, *,
+def learn(env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
           clip_param, entcoeff,  # clipping parameter epsilon, entropy coeff
           optim_epochs, optim_stepsize, optim_batchsize,  # optimization hypers
@@ -251,7 +242,7 @@ def learn(env, test_env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
@@ -334,11 +325,11 @@ def learn(env, test_env, policy_fn, *,
 
     best_fitness = -np.inf
 
-    eval_seq = traj_segment_generator_eval(pi, test_env,
+    eval_seq = traj_segment_generator_eval(pi, env,
                                            timesteps_per_actorbatch,
                                            stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq = eval_seq)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -384,16 +375,14 @@ def learn(env, test_env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
-        cmean_adapted = 1.0
+        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-12)
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
-        # max_v_train_iter = 10
         logger.log("********** Iteration %i ************" % iters_so_far)
+        eval_seg = eval_seq.__next__()
+        rewbuffer.extend(eval_seg["ep_rets"])
+        lenbuffer.extend(eval_seg["ep_lens"])
         if iters_so_far == 0:
-            eval_seg = eval_seq.__next__()
-            rewbuffer.extend(eval_seg["ep_rets"])
-            lenbuffer.extend(eval_seg["ep_lens"])
             result_record()
 
         # Repository Train
