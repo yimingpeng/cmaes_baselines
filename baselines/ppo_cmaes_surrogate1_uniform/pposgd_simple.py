@@ -77,10 +77,11 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     prevacs = acs.copy()
     traj_index = []
     index_count = 0
+    record = False
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record()
+            record = True
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
@@ -114,6 +115,9 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         cur_ep_len += 1
         timesteps_so_far += 1
         if new:
+            if record:
+                result_record()
+                record = False
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             traj_index.append(index_count)
@@ -375,7 +379,8 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-12)
+        # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+        cmean_adapted = 1.0
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
@@ -538,8 +543,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                solutions = es.ask()
+                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                # solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
