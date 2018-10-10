@@ -257,7 +257,7 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = 0.1*tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
@@ -390,7 +390,7 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-12)
+        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
