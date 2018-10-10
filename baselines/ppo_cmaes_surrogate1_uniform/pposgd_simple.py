@@ -26,19 +26,20 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     cur_ep_len = 0  # len of current episode
     ep_rets = []  # returns of completed episodes in this segment
     ep_lens = []  # lengths of ...
-
+    ep_num = 0
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
+        if t > 0 and t % horizon == 0 and ep_num >= 5:
             yield {"ep_rets": ep_rets, "ep_lens": ep_lens}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            ep_num = 0
 
         ob, rew, new, _ = env.step(ac)
         # rew = np.clip(rew, -1., 1.)
@@ -46,6 +47,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
+            ep_num += 1
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -54,7 +56,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
     # Trajectories generators
     global timesteps_so_far
     t = 0
@@ -79,10 +81,11 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     traj_index = []
     index_count = 0
     normalizer = Normalizer(1)
-
+    record =  False
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record()
+            # result_record()
+            record = True
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
@@ -124,6 +127,12 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             traj_index.append(index_count)
             cur_ep_ret = 0
             cur_ep_len = 0
+            ob = env.reset()
+            if record:
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
             ob = env.reset()
         t += 1
         index_count += 1
@@ -334,7 +343,7 @@ def learn(env, policy_fn, *,
                                            timesteps_per_actorbatch,
                                            stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq = eval_seq)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -384,10 +393,10 @@ def learn(env, policy_fn, *,
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
-        eval_seg = eval_seq.__next__()
-        rewbuffer.extend(eval_seg["ep_rets"])
-        lenbuffer.extend(eval_seg["ep_lens"])
         if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
             result_record()
 
         # Repository Train
