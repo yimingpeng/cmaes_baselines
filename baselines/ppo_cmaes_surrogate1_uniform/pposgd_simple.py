@@ -11,6 +11,7 @@ from baselines import logger
 from baselines.common import Dataset, explained_variance, fmt_row, zipsame
 from baselines.common.mpi_adam import MpiAdam
 from baselines.ppo_cmaes.cnn_policy import CnnPolicy
+from baselines.common.normalizer import Normalizer
 
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
@@ -77,6 +78,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     prevacs = acs.copy()
     traj_index = []
     index_count = 0
+    normalizer = Normalizer(1)
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
@@ -106,11 +108,14 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         prevacs[i] = prevac
 
         ob, rew, new, _ = env.step(ac)
+        original_rew = rew
+        normalizer.update(rew)
+        rew = normalizer.normalize(rew)
         # rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
 
-        cur_ep_ret += rew
+        cur_ep_ret += original_rew
         cur_ep_len += 1
         timesteps_so_far += 1
         if new:
