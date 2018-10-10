@@ -40,7 +40,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ep_lens = []
 
         ob, rew, new, _ = env.step(ac)
-        rew = np.clip(rew, -1., 1.)
+        # rew = np.clip(rew, -1., 1.)
 
         cur_ep_ret += rew
         cur_ep_len += 1
@@ -81,7 +81,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            record = True
+            # record = True
+            result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
@@ -107,7 +108,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         prevacs[i] = prevac
 
         ob, rew, new, _ = env.step(ac)
-        rew = np.clip(rew, -1., 1.)
+        # rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
 
@@ -115,12 +116,12 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         cur_ep_len += 1
         timesteps_so_far += 1
         if new:
-            if record:
-                eval_seg = eval_seq.__next__()
-                rewbuffer.extend(eval_seg["ep_rets"])
-                lenbuffer.extend(eval_seg["ep_lens"])
-                result_record()
-                record = False
+            # if record:
+            #     eval_seg = eval_seq.__next__()
+            #     rewbuffer.extend(eval_seg["ep_rets"])
+            #     lenbuffer.extend(eval_seg["ep_lens"])
+            #     result_record()
+            #     record = False
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             traj_index.append(index_count)
@@ -400,8 +401,8 @@ def learn(env, test_env, policy_fn, *,
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        # rewbuffer.extend(seg["ep_rets"])
-        # lenbuffer.extend(seg["ep_lens"])
+        rewbuffer.extend(seg["ep_rets"])
+        lenbuffer.extend(seg["ep_lens"])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         if segs is None:
