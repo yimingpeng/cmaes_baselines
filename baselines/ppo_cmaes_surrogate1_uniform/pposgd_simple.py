@@ -134,7 +134,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
                 lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
-            ob = env.reset()
         t += 1
         index_count += 1
 
