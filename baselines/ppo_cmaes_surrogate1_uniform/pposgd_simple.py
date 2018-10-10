@@ -406,8 +406,8 @@ def learn(env, policy_fn, *,
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        rewbuffer.extend(seg["ep_rets"])
-        lenbuffer.extend(seg["ep_lens"])
+        # rewbuffer.extend(seg["ep_rets"])
+        # lenbuffer.extend(seg["ep_lens"])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         if segs is None:
