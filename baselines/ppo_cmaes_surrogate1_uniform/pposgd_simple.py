@@ -112,8 +112,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 
         ob, rew, new, _ = env.step(ac)
         original_rew = rew
-        # normalizer.update(rew)
-        # rew = normalizer.normalize(rew)
+        normalizer.update(rew)
+        rew = normalizer.normalize(rew)
         # rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
