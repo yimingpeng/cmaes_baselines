@@ -81,8 +81,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
 
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            # record = True
-            result_record()
+            record = True
+            # result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, -1., 1.)
@@ -116,17 +116,18 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         cur_ep_len += 1
         timesteps_so_far += 1
         if new:
+            ep_rets.append(cur_ep_ret)
+            ep_lens.append(cur_ep_len)
+            traj_index.append(index_count)
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            # ob = env.reset()
             # if record:
             #     eval_seg = eval_seq.__next__()
             #     rewbuffer.extend(eval_seg["ep_rets"])
             #     lenbuffer.extend(eval_seg["ep_lens"])
             #     result_record()
             #     record = False
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-            traj_index.append(index_count)
-            cur_ep_ret = 0
-            cur_ep_len = 0
             ob = env.reset()
         t += 1
         index_count += 1
@@ -383,8 +384,8 @@ def learn(env, test_env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
-        # cmean_adapted = 1.0
+        # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+        cmean_adapted = 1.0
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         # max_v_train_iter = 10
@@ -548,8 +549,8 @@ def learn(env, test_env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                # solutions = es.ask()
+                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
