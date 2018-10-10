@@ -34,8 +34,8 @@ def train(env_id, num_timesteps, seed):
             hid_size=64, num_hid_layers=2)
 
     env = make_pybullet_env(env_id, seed)
-    # test_env = make_pybullet_env(env_id, seed)
-    pposgd_simple.learn(env, policy_fn,
+    test_env = make_pybullet_env(env_id, seed)
+    pposgd_simple.learn(env, test_env, policy_fn,
                         max_fitness = max_fitness,  # has to be negative, we use minization
                         popsize = popsize,
                         gensize = gensize,
@@ -52,7 +52,7 @@ def train(env_id, num_timesteps, seed):
                         seed=seed,
                         env_id=env_id)
     env.close()
-    # test_env.close()
+    test_env.close()
 
 
 def main():

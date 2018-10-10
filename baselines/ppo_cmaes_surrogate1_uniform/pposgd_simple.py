@@ -188,7 +188,7 @@ def uniform_select(weights, proportion):
     return index, np.take(weights, index, axis = 0)
 
 
-def learn(env, policy_fn, *,
+def learn(env, test_env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
           clip_param, entcoeff,  # clipping parameter epsilon, entropy coeff
           optim_epochs, optim_stepsize, optim_batchsize,  # optimization hypers
@@ -332,7 +332,7 @@ def learn(env, policy_fn, *,
 
     best_fitness = -np.inf
 
-    eval_seq = traj_segment_generator_eval(pi, env,
+    eval_seq = traj_segment_generator_eval(pi, test_env,
                                            timesteps_per_actorbatch,
                                            stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
