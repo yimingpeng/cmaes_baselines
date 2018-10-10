@@ -385,7 +385,8 @@ def learn(env, test_env, policy_fn, *,
         # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         cmean_adapted = 1.0
         # if timesteps_so_far % max_timesteps == 10:
-        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        max_v_train_iter = 10
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:
             eval_seg = eval_seq.__next__()
