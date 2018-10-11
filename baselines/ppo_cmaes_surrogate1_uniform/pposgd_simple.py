@@ -379,10 +379,10 @@ def learn(env, policy_fn, *,
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
-        eval_seg = eval_seq.__next__()
-        rewbuffer.extend(eval_seg["ep_rets"])
-        lenbuffer.extend(eval_seg["ep_lens"])
         if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
             result_record()
 
         # Repository Train
