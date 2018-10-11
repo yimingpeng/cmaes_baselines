@@ -50,8 +50,6 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
-            print("cur_ep_ret=", cur_ep_ret)
-            print("cur_ep_len=", cur_ep_len)
             ep_num += 1
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
@@ -107,6 +105,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
             ep_lens = []
             index_count = 0
             traj_index = []
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
         i = t % horizon
         obs[i] = ob
         vpreds[i] = vpred
