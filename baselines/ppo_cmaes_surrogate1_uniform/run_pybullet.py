@@ -11,10 +11,12 @@ currentdir = os.path.dirname(
     os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
+
+from baselines.common import tf_util as U, set_global_seeds
+set_global_seeds(1)
 # very important, don't remove, otherwise pybullet cannot run (reasons are unknown)
 import pybullet_envs
 from baselines.common.cmd_util import pybullet_arg_parser, make_pybullet_env
-from baselines.common import tf_util as U
 from baselines import logger
 
 

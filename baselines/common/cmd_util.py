@@ -86,7 +86,8 @@ def make_pybullet_env(env_id, seed):
     Added by Yiming (29/5/2018)
     Create a wrapped, monitored gym.Env for MuJoCo.
     """
-    set_global_seeds(seed)
+    # import numpy as np
+    # print(np.random.get_state()[1][0])
     # pybullet.connect(None)
     env = gym.make(env_id)
     env = Monitor(env, logger.get_dir(),allow_early_resets=True)

@@ -89,6 +89,7 @@ def initialize():
 # ================================================================
 
 def normc_initializer(std=1.0, axis=0):
+    import numpy as np
     def _initializer(shape, dtype=None, partition_info=None):  # pylint: disable=W0613
         out = np.random.randn(*shape).astype(np.float32)
         out *= std / np.sqrt(np.square(out).sum(axis=axis, keepdims=True))

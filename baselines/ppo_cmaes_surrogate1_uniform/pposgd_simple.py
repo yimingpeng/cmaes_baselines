@@ -3,19 +3,19 @@ from collections import deque
 
 import numpy as np
 import tensorflow as tf
+import random
 from mpi4py import MPI
 
 import baselines.common.tf_util as U
 import cma
 from baselines import logger
-from baselines.common import Dataset, explained_variance, fmt_row, zipsame
+from baselines.common import Dataset, explained_variance, fmt_row, zipsame, set_global_seeds
 from baselines.common.mpi_adam import MpiAdam
 from baselines.ppo_cmaes.cnn_policy import CnnPolicy
 
 test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
 mean_action_Condition = True
-
 
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
@@ -127,7 +127,8 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart, best_fitness
-    # print(rewbuffer)
+    # print(np.random.get_state()[1][0])
+    print(rewbuffer)
     # if best_fitness != -np.inf:
     #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
@@ -242,7 +243,7 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = 0.25 * tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
@@ -367,7 +368,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / max_timesteps, 1e-8)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8)
 
         else:
             raise NotImplementedError
@@ -375,7 +376,7 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-12)
+        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
@@ -393,6 +394,7 @@ def learn(env, policy_fn, *,
 
         rewbuffer.extend(seg["ep_rets"])
         lenbuffer.extend(seg["ep_lens"])
+        # print(np.random.get_state()[1][0])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
         if segs is None:
@@ -451,7 +453,6 @@ def learn(env, policy_fn, *,
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                 # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
         else:
-
             # Update v target
             new = segs["new"]
             rew = segs["rew"]

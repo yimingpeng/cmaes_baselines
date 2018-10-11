@@ -25,6 +25,10 @@ class MlpPolicy(object):
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape = ob_space.shape)
+        # import numpy as np
+        # print("line 29 mlp", np.random.get_state()[1][0])
+        # print(np.random.randint(-10, 10, size = 5))
+        # print("line 31 mlp", np.random.get_state()[1][0])
 
         with tf.variable_scope('vf'):
             obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
@@ -34,7 +38,6 @@ class MlpPolicy(object):
                                                       kernel_initializer = U.normc_initializer(1.0)))
             self.vpred = tf.layers.dense(last_out, 1, name = 'final', kernel_initializer = U.normc_initializer(1.0))[:,
                          0]
-
         with tf.variable_scope('pol'):
             last_out = obz
             for i in range(num_hid_layers):
@@ -51,7 +54,6 @@ class MlpPolicy(object):
                                           kernel_initializer = U.normc_initializer(0.01))
 
         self.pd = pdtype.pdfromflat(pdparam)
-
         self.state_in = []
         self.state_out = []
 
