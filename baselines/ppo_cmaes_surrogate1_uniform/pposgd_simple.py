@@ -127,7 +127,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart, best_fitness
-    print(rewbuffer)
+    # print(rewbuffer)
     # if best_fitness != -np.inf:
     #     rewbuffer.append(best_fitness)
     if len(lenbuffer) == 0:
