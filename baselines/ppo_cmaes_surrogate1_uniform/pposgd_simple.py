@@ -39,7 +39,10 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            cur_ep_ret = 0
+            cur_ep_len = 0
             ep_num = 0
+            ob = env.reset()
 
         ob, rew, new, _ = env.step(ac)
         # rew = np.clip(rew, -1., 1.)
