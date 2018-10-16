@@ -325,7 +325,7 @@ def learn(env, policy_fn, *,
 
     eval_seq = traj_segment_generator_eval(pi, env,
                                            timesteps_per_actorbatch,
-                                           stochastic = True)
+                                           stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
