@@ -25,6 +25,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     cur_ep_len = 0  # len of current episode
     ep_rets = []  # returns of completed episodes in this segment
     ep_lens = []  # lengths of ...
+    ep_num = 0
 
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
@@ -32,12 +33,15 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
+        if t > 0 and t % horizon == 0 and ep_num >= 5:
             yield {"ep_rets": ep_rets, "ep_lens": ep_lens}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            ep_num = 0
+            cur_ep_ret = 0
+            cur_ep_len = 0
 
         ob, rew, new, _ = env.step(ac)
         rew = np.clip(rew, -1., 1.)
@@ -45,6 +49,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
+            ep_num += 1
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -97,6 +102,8 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             ep_lens = []
             index_count = 0
             traj_index = []
+            cur_ep_ret = 0
+            cur_ep_len = 0
         i = t % horizon
         obs[i] = ob
         vpreds[i] = vpred
@@ -393,8 +400,8 @@ def learn(env, policy_fn, *,
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        rewbuffer.extend(seg["ep_rets"])
-        lenbuffer.extend(seg["ep_lens"])
+        # rewbuffer.extend(seg["ep_rets"])
+        # lenbuffer.extend(seg["ep_lens"])
         # print(np.random.get_state()[1][0])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
