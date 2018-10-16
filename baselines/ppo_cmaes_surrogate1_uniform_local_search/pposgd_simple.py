@@ -282,10 +282,10 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 40.0)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
 
     lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
-                             losses + [U.flatgrad(total_loss, var_list, 40.0)])
+                             losses + [U.flatgrad(total_loss, var_list)])
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
@@ -563,8 +563,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                # solutions = es.ask()
+                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
