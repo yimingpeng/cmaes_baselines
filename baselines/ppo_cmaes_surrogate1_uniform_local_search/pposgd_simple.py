@@ -28,6 +28,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
 
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -81,6 +82,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -264,10 +266,10 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 40.0)])
 
     lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
-                             losses + [U.flatgrad(total_loss, var_list)])
+                             losses + [U.flatgrad(total_loss, var_list, 40.0)])
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
     adam = MpiAdam(var_list, epsilon = adam_epsilon)

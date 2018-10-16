@@ -28,7 +28,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
 
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
-        ac = np.clip(ac, -1., 1.)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -83,7 +83,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
-        ac = np.clip(ac, -1., 1.)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -243,7 +243,7 @@ def learn(env, policy_fn, *,
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
-    vf_loss = 0.25 * tf.reduce_mean(tf.square(pi.vpred - ret))
+    vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vpred - ret))
     vf_losses = [vf_loss]
     vf_loss_names = ["vf_loss"]
 
@@ -269,7 +269,7 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 40.0)])
 
     lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
                              losses + [U.flatgrad(total_loss, var_list)])
@@ -376,7 +376,8 @@ def learn(env, policy_fn, *,
         epsilon = max(0.5 - float(timesteps_so_far) / (max_timesteps), 0) * cur_lrmult
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
-        cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+        # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+        cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
         max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
