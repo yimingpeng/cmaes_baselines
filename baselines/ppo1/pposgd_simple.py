@@ -70,6 +70,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 def result_record():
     global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
         episodes_so_far, tstart
+    print(np.random.get_state()[1][0])
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -127,7 +128,7 @@ def learn(env, policy_fn, *,
 
     ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
-
+    import numpy as np
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
