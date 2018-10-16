@@ -89,6 +89,7 @@ def make_pybullet_env(env_id, seed):
     # import numpy as np
     # print(np.random.get_state()[1][0])
     # pybullet.connect(None)
+    set_global_seeds(seed)
     env = gym.make(env_id)
     env = Monitor(env, logger.get_dir(),allow_early_resets=True)
     # env = InvertedDoublePendulumBulletEnv()
