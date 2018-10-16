@@ -3,7 +3,6 @@ from collections import deque
 
 import numpy as np
 import tensorflow as tf
-import random
 from mpi4py import MPI
 
 import baselines.common.tf_util as U
@@ -44,7 +43,6 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             cur_ep_len = 0
 
         ob, rew, new, _ = env.step(ac)
-        rew = np.clip(rew, -1., 1.)
 
         cur_ep_ret += rew
         cur_ep_len += 1
@@ -113,7 +111,6 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         prevacs[i] = prevac
 
         ob, rew, new, _ = env.step(ac)
-        rew = np.clip(rew, -1., 1.)
         rews[i] = rew
         next_obs[i] = ob
 
@@ -278,8 +275,6 @@ def learn(env, policy_fn, *,
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list, 40.0)])
 
-    lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
-                             losses + [U.flatgrad(total_loss, var_list)])
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
@@ -547,8 +542,8 @@ def learn(env, policy_fn, *,
                     break
                 # logger.log("Iteration:" + str(iters_so_far) + " - sub-train Generation for Policy:" + str(es.countiter))
                 # logger.log("Sigma=" + str(es.sigma))
-                # solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
-                solutions = es.ask()
+                solutions = es.ask(sigma_fac = max(cur_lrmult, 1e-8))
+                # solutions = es.ask()
                 # solutions = [np.clip(solution, -5.0, 5.0).tolist() for solution in solutions]
                 costs = []
                 lens = []
