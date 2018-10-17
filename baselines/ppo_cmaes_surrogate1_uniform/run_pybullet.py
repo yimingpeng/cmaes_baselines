@@ -12,8 +12,7 @@ currentdir = os.path.dirname(
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 
-from baselines.common import tf_util as U, set_global_seeds
-set_global_seeds(1)
+from baselines.common import tf_util as U
 # very important, don't remove, otherwise pybullet cannot run (reasons are unknown)
 import pybullet_envs
 from baselines.common.cmd_util import pybullet_arg_parser, make_pybullet_env
@@ -22,7 +21,7 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 10
+    popsize = 5
     gensize = 200 # For each iterations
     max_v_train_iter = 5
     bounds = [-5.0, 5.0]

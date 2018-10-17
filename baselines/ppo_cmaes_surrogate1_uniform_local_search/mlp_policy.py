@@ -4,14 +4,16 @@ import tensorflow as tf
 import gym
 from baselines.common.distributions import make_pdtype
 
+
 class MlpPolicy(object):
     recurrent = False
+
     def __init__(self, name, *args, **kwargs):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var = True):
         assert isinstance(ob_space, gym.spaces.Box)
 
         # Add the variable to track layers
@@ -19,7 +21,7 @@ class MlpPolicy(object):
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
 
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
+        ob = U.get_placeholder(name = "ob", dtype = tf.float32, shape = [sequence_length] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)

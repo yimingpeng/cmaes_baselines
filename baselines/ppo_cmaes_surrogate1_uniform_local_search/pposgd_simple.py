@@ -25,6 +25,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     ep_rets = []  # returns of completed episodes in this segment
     ep_lens = []  # lengths of ...
     ep_num = 0
+
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
         ac = np.clip(ac, env.action_space.low, env.action_space.high)
@@ -167,24 +168,6 @@ def compute_weight_decay(weight_decay, model_param_list):
     return weight_decay * np.mean(model_param_grid * model_param_grid, axis = 1)
 
 
-def add_vtarg_and_adv(segs, gamma, lam):
-    """
-    Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
-    """
-    new = np.append(segs["new"],
-                    0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
-    vpred = np.append(segs["vpred"], segs["nextvpred"])
-    T = len(segs["rew"])
-    segs["adv"] = gaelam = np.empty(T, 'float32')
-    rew = segs["rew"]
-    lastgaelam = 0
-    for t in reversed(range(T)):
-        nonterminal = 1 - new[t + 1]
-        delta = rew[t] + gamma * vpred[t + 1] * nonterminal - vpred[t]
-        gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
-    segs["tdlamret"] = segs["adv"] + segs["vpred"]
-
-
 def uniform_select(weights, proportion):
     num_of_weights = int(proportion * len(weights))
     assert num_of_weights != 0  # make sure there are something to be selected
@@ -193,6 +176,22 @@ def uniform_select(weights, proportion):
     index = np.random.choice(range(len(
         weights)), length, replace = False)
     return index, np.take(weights, index, axis = 0)
+
+def add_vtarg_and_adv(seg, gamma, lam):
+    """
+    Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
+    """
+    new = np.append(seg["new"], 0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+    vpred = np.append(seg["vpred"], seg["nextvpred"])
+    T = len(seg["rew"])
+    seg["adv"] = gaelam = np.empty(T, 'float32')
+    rew = seg["rew"]
+    lastgaelam = 0
+    for t in reversed(range(T)):
+        nonterminal = 1 - new[t + 1]
+        delta = rew[t] + gamma * vpred[t + 1] * nonterminal - vpred[t]
+        gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
+    seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
 
 def learn(env, policy_fn, *,
@@ -381,8 +380,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
-
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps / 2), 0)
         else:
             raise NotImplementedError
 
@@ -526,10 +524,6 @@ def learn(env, policy_fn, *,
             # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
             # add_vtarg_and_adv(seg, gamma, lam)
 
-
-        # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
-        # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
-        # add_vtarg_and_adv(seg, gamma, lam)
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
