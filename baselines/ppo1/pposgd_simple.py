@@ -8,7 +8,49 @@ from baselines.common.mpi_moments import mpi_moments
 from mpi4py import MPI
 from collections import deque
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+
+def traj_segment_generator_eval(pi, env, horizon, stochastic):
+    t = 0
+    ob = env.reset()
+
+    cur_ep_ret = 0  # return in current episode
+    cur_ep_len = 0  # len of current episode
+    ep_rets = []  # returns of completed episodes in this segment
+    ep_lens = []  # lengths of ...
+    ep_num = 0
+    while True:
+        ac, vpred = pi.act(stochastic, ob)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        # Slight weirdness here because we need value function at time T
+        # before returning segment [0, T-1] so we get the correct
+        # terminal value
+        if t > 0 and t % horizon == 0 and ep_num >= 5:
+            yield {"ep_rets": ep_rets, "ep_lens": ep_lens}
+            # Be careful!!! if you change the downstream algorithm to aggregate
+            # several of these batches, then be sure to do a deepcopy
+            ep_rets = []
+            ep_lens = []
+            ep_num = 0
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
+
+        ob, rew, new, _ = env.step(ac)
+
+        cur_ep_ret += rew
+        cur_ep_len += 1
+        if new:
+            ep_num += 1
+            ep_rets.append(cur_ep_ret)
+            ep_lens.append(cur_ep_len)
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
+        t += 1
+
+
+def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
     global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -34,17 +76,11 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             # result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
-        ac = np.clip(ac, env.action_space.low, env.action_space.high)
-
-        # if ac < env.action_space.low or ac > env.action_space.high:
-        #     print(ac)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            if record:
-                result_record()
-                record = False
             yield {"ob": obs, "rew": rews, "vpred": vpreds, "new": news,
                    "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
                    "ep_rets": ep_rets, "ep_lens": ep_lens}
@@ -54,12 +90,15 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             ep_lens = []
             cur_ep_ret = 0
             cur_ep_len = 0
+            ob = env.reset()
         i = t % horizon
         obs[i] = ob
         vpreds[i] = vpred
         news[i] = new
         acs[i] = ac
         prevacs[i] = prevac
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
@@ -68,6 +107,9 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         timesteps_so_far += 1
         if new:
             if record:
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
             ep_rets.append(cur_ep_ret)
@@ -173,7 +215,10 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)
+    eval_seq = traj_segment_generator_eval(pi, env,
+                                           timesteps_per_actorbatch,
+                                           stochastic = False)
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq=eval_seq)
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, best_fitness
@@ -206,14 +251,21 @@ def learn(env, policy_fn, *,
             raise NotImplementedError
 
         logger.log("********** Iteration %i ************" % iters_so_far)
-        seg = seg_gen.__next__()
-        lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
-        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
         if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
             result_record()
+
+
+        seg = seg_gen.__next__()
+        # lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
+        # listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+        # lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        # lenbuffer.extend(lens)
+        # rewbuffer.extend(rews)
+        # if iters_so_far == 0:
+        #     result_record()
 
         add_vtarg_and_adv(seg, gamma, lam)
 
