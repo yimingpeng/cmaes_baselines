@@ -16,7 +16,6 @@ test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
 mean_action_Condition = True
 
-
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
     ob = env.reset()

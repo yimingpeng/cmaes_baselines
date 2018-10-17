@@ -2007,7 +2007,7 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
             utils.print_message('   %d pre-injected solutions will be used (popsize=%d)' %
                                 (len(arinj), len(ary)))
 
-        sigma = sigma if sigma <= 3 * self.sigma0 else self.sigma0
+        sigma = sigma if sigma <= 2 * self.sigma0 else self.sigma0
         sigma = 1e-8 if sigma < 1e-8 else sigma
         pop = xmean + sigma * ary
         #[YIMING] Add parameter clipping
