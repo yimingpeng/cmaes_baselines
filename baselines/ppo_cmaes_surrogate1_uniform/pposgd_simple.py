@@ -566,8 +566,8 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 3 * (i + 1))
-                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
+                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 3 * (i + 1))
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay

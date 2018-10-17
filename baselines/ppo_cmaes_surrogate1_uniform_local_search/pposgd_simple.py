@@ -523,7 +523,7 @@ def learn(env, policy_fn, *,
             for _ in range(optim_epochs):
                 for batch in d.iterate_once(optim_batchsize):
                     *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult,
-                                                1 / 4)
+                                                1)
                     adam.update(g, optim_stepsize * cur_lrmult)
 
             # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
@@ -575,8 +575,8 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
-                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
+                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
