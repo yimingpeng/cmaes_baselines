@@ -34,7 +34,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             # result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
-        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
 
         # if ac < env.action_space.low or ac > env.action_space.high:
         #     print(ac)
