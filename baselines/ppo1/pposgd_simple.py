@@ -20,6 +20,8 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
     ep_num = 0
     while True:
         ac, vpred = pi.act(stochastic, ob)
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
@@ -76,6 +78,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
             # result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
