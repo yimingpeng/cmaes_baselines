@@ -283,7 +283,7 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 60.0)])
 
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
