@@ -202,7 +202,7 @@ def learn(env, policy_fn, *,
     loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
 
     var_list = pi.get_trainable_variables()
-    lossandgrad = U.function([ob, ac, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)])
+    lossandgrad = U.function([ob, ac, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list, 40.0)])
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
 
     assign_old_eq_new = U.function([], [], updates = [tf.assign(oldv, newv)
