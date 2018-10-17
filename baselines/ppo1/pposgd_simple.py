@@ -35,7 +35,9 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             cur_ep_len = 0
             ob = env.reset()
 
-        ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
         ob, rew, new, _ = env.step(ac)
 
         cur_ep_ret += rew
@@ -96,9 +98,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         news[i] = new
         acs[i] = ac
         prevacs[i] = prevac
-        # if env.spec._env_name == "LunarLanderContinuous":
-        #     ac = np.clip(ac, -1.0, 1.0)
-        ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        if env.spec._env_name == "LunarLanderContinuous":
+            ac = np.clip(ac, -1.0, 1.0)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
