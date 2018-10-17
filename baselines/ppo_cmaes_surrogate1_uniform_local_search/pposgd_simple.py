@@ -281,10 +281,10 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 40.0)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 20.0)])
 
     lossandgrad = U.function([ob, ac, atarg, ret, lrmult, layer_clip],
-                             losses + [U.flatgrad(total_loss, var_list, 40.0)])
+                             losses + [U.flatgrad(total_loss, var_list, 20.0)])
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
@@ -389,9 +389,9 @@ def learn(env, policy_fn, *,
         # epsilon = 0.2
         sigma_adapted = max(max(sigma - float(timesteps_so_far) / (5000 * max_timesteps), 0) * cur_lrmult, 1e-8)
         # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
-        # cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
+        # cmean_adapted = max(0.8 - float(time˚steps_so_far) / (2*max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
-        # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:
             eval_seg = eval_seq.__next__()
