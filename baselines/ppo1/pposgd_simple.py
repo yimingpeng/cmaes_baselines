@@ -52,7 +52,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
+def traj_segment_generator(pi, env, horizon, stochastic):
     global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -82,6 +82,12 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
+            if record:
+                # eval_seg = eval_seq.__next__()
+                # rewbuffer.extend(eval_seg["ep_rets"])
+                # lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             yield {"ob": obs, "rew": rews, "vpred": vpreds, "new": news,
                    "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
                    "ep_rets": ep_rets, "ep_lens": ep_lens}
@@ -109,9 +115,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         timesteps_so_far += 1
         if new:
             if record:
-                eval_seg = eval_seq.__next__()
-                rewbuffer.extend(eval_seg["ep_rets"])
-                lenbuffer.extend(eval_seg["ep_lens"])
+                # eval_seg = eval_seq.__next__()
+                # rewbuffer.extend(eval_seg["ep_rets"])
+                # lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
             ep_rets.append(cur_ep_ret)
@@ -216,10 +222,10 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    eval_seq = traj_segment_generator_eval(pi, env,
-                                           timesteps_per_actorbatch,
-                                           stochastic = False)
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq=eval_seq)
+    # eval_seq = traj_segment_generator_eval(pi, env,
+    #                                        timesteps_per_actorbatch,
+    #                                        stochastic = False)
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \
         tstart, lenbuffer, rewbuffer, best_fitness
@@ -252,26 +258,26 @@ def learn(env, policy_fn, *,
             raise NotImplementedError
 
         logger.log("********** Iteration %i ************" % iters_so_far)
-        if iters_so_far == 0:
-            eval_seg = eval_seq.__next__()
-            rewbuffer.extend(eval_seg["ep_rets"])
-            lenbuffer.extend(eval_seg["ep_lens"])
-            result_record()
+        # if iters_so_far == 0:
+        #     eval_seg = eval_seq.__next__()
+        #     rewbuffer.extend(eval_seg["ep_rets"])
+        #     lenbuffer.extend(eval_seg["ep_lens"])
+        #     result_record()
 
 
         seg = seg_gen.__next__()
-        # lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
-        # listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-        # lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        # lenbuffer.extend(lens)
-        # rewbuffer.extend(rews)
-        # if iters_so_far == 0:
-        #     result_record()
+        lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
+        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+        lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        lenbuffer.extend(lens)
+        rewbuffer.extend(rews)
+        if iters_so_far == 0:
+            result_record()
 
         add_vtarg_and_adv(seg, gamma, lam)
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
-        ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], np.clip(seg["tdlamret"], -1.0, 1.0)
+        ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         vpredbefore = seg["vpred"]  # predicted value function before udpate
         atarg = (atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
         d = Dataset(dict(ob = ob, ac = ac, atarg = atarg, vtarg = tdlamret), shuffle = not pi.recurrent)
