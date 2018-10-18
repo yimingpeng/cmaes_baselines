@@ -83,6 +83,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         # terminal value
         if t > 0 and t % horizon == 0:
             if record:
+                ob = env.reset()
                 eval_seg = eval_seq.__next__()
                 rewbuffer.extend(eval_seg["ep_rets"])
                 lenbuffer.extend(eval_seg["ep_lens"])
@@ -112,6 +113,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         timesteps_so_far += 1
         if new:
             if record:
+                ob = env.reset()
                 eval_seg = eval_seq.__next__()
                 rewbuffer.extend(eval_seg["ep_rets"])
                 lenbuffer.extend(eval_seg["ep_lens"])
