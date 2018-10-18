@@ -58,7 +58,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
+def traj_segment_generator(pi, env, horizon, stochastic):
     # Trajectories generators
     global timesteps_so_far
     t = 0
@@ -93,6 +93,12 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
+            if record:
+                # eval_seg = eval_seq.__next__()
+                # rewbuffer.extend(eval_seg["ep_rets"])
+                # lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "act_props": act_props, "new": news,
                    "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
                    "ep_rets": ep_rets, "ep_lens": ep_lens, "traj_index": traj_index}
@@ -124,9 +130,9 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         timesteps_so_far += 1
         if new:
             if record:
-                eval_seg = eval_seq.__next__()
-                rewbuffer.extend(eval_seg["ep_rets"])
-                lenbuffer.extend(eval_seg["ep_lens"])
+                # eval_seg = eval_seq.__next__()
+                # rewbuffer.extend(eval_seg["ep_rets"])
+                # lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
             ep_rets.append(cur_ep_ret)
@@ -339,11 +345,11 @@ def learn(env, policy_fn, *,
 
     best_fitness = -np.inf
 
-    eval_seq = traj_segment_generator_eval(pi, env,
-                                           timesteps_per_actorbatch,
-                                           stochastic = False)
+    # eval_seq = traj_segment_generator_eval(pi, env,
+    #                                        timesteps_per_actorbatch,
+    #                                        stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq = eval_seq)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -381,7 +387,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / ( max_timesteps), 1e-8)
 
         else:
             raise NotImplementedError
