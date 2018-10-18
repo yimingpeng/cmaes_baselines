@@ -222,7 +222,7 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    eval_seq = traj_segment_generator_eval(pi, env, timesteps_per_actorbatch, stochastic = True)
+    eval_seq = traj_segment_generator_eval(pi, env, timesteps_per_actorbatch, stochastic = False)
     seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq = eval_seq)
 
     global timesteps_so_far, episodes_so_far, iters_so_far, \

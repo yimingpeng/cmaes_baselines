@@ -42,7 +42,6 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ep_num = 0
             cur_ep_ret = 0
             cur_ep_len = 0
-            ob = env.reset()
 
         ob, rew, new, _ = env.step(ac)
 
