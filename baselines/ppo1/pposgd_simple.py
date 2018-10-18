@@ -187,7 +187,6 @@ def learn(env, policy_fn, *,
 
     ob = U.get_placeholder_cached(name = "ob")
     ac = pi.pdtype.sample_placeholder([None])
-    import numpy as np
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
