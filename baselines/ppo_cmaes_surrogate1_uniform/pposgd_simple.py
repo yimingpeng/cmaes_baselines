@@ -58,9 +58,9 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
     # Trajectories generators
-    global timesteps_so_far
+    global timesteps_so_far, rewbuffer, lenbuffer
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
     new = True  # marks if we're on first timestep of an episode
@@ -94,9 +94,10 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         # terminal value
         if t > 0 and t % horizon == 0:
             if record:
-                # eval_seg = eval_seq.__next__()
-                # rewbuffer.extend(eval_seg["ep_rets"])
-                # lenbuffer.extend(eval_seg["ep_lens"])
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
             yield {"ob": obs, "next_ob": next_obs, "rew": rews, "vpred": vpreds, "act_props": act_props, "new": news,
@@ -108,9 +109,6 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             ep_lens = []
             index_count = 0
             traj_index = []
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
 
         i = t % horizon
         obs[i] = ob
@@ -130,9 +128,10 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         timesteps_so_far += 1
         if new:
             if record:
-                # eval_seg = eval_seq.__next__()
-                # rewbuffer.extend(eval_seg["ep_rets"])
-                # lenbuffer.extend(eval_seg["ep_lens"])
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
                 result_record()
                 record = False
             ep_rets.append(cur_ep_ret)
@@ -290,7 +289,7 @@ def learn(env, policy_fn, *,
             "final")] + logstd_var_list)
 
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
-                                vf_losses + [U.flatgrad(vf_loss, vf_var_list, 20.0)])
+                                vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
 
 
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
@@ -345,11 +344,11 @@ def learn(env, policy_fn, *,
 
     best_fitness = -np.inf
 
-    # eval_seq = traj_segment_generator_eval(pi, env,
-    #                                        timesteps_per_actorbatch,
-    #                                        stochastic = False)
+    eval_seq = traj_segment_generator_eval(pi, env,
+                                           timesteps_per_actorbatch,
+                                           stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq=eval_seq)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -387,7 +386,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / ( max_timesteps), 1e-8)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / ( max_timesteps), 0)
 
         else:
             raise NotImplementedError
@@ -402,11 +401,11 @@ def learn(env, policy_fn, *,
         # if timesteps_so_far % max_timesteps == 10:
         # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
-        # if iters_so_far == 0:
-        #     eval_seg = eval_seq.__next__()
-        #     rewbuffer.extend(eval_seg["ep_rets"])
-        #     lenbuffer.extend(eval_seg["ep_lens"])
-        #     result_record()
+        if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
+            result_record()
 
         # Repository Train
         train_segs = {}
@@ -414,10 +413,10 @@ def learn(env, policy_fn, *,
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        rewbuffer.extend(seg["ep_rets"])
-        lenbuffer.extend(seg["ep_lens"])
-        if iters_so_far == 0:
-            result_record()
+        # rewbuffer.extend(seg["ep_rets"])
+        # lenbuffer.extend(seg["ep_lens"])
+        # if iters_so_far == 0:
+        #     result_record()
         # print(np.random.get_state()[1][0])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
