@@ -402,11 +402,11 @@ def learn(env, policy_fn, *,
         # if timesteps_so_far % max_timesteps == 10:
         # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
-        if iters_so_far == 0:
-            eval_seg = eval_seq.__next__()
-            rewbuffer.extend(eval_seg["ep_rets"])
-            lenbuffer.extend(eval_seg["ep_lens"])
-            result_record()
+        # if iters_so_far == 0:
+        #     eval_seg = eval_seq.__next__()
+        #     rewbuffer.extend(eval_seg["ep_rets"])
+        #     lenbuffer.extend(eval_seg["ep_lens"])
+        #     result_record()
 
         # Repository Train
         train_segs = {}
@@ -414,8 +414,10 @@ def learn(env, policy_fn, *,
         add_vtarg_and_adv(seg, gamma, lam)
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])  # update running mean/std for normalization
 
-        # rewbuffer.extend(seg["ep_rets"])
-        # lenbuffer.extend(seg["ep_lens"])
+        rewbuffer.extend(seg["ep_rets"])
+        lenbuffer.extend(seg["ep_lens"])
+        if iters_so_far == 0:
+            result_record()
         # print(np.random.get_state()[1][0])
 
         assign_old_eq_new()  # set old parameter values to new parameter values
