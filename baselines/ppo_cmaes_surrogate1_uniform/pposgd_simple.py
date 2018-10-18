@@ -28,7 +28,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
 
     while True:
         ac, vpred, a_prop = pi.act(stochastic, ob)
-        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
@@ -89,7 +89,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
             # result_record()
         prevac = ac
         ac, vpred, act_prop = pi.act(stochastic, ob)
-        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -115,6 +114,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
         acs[i] = ac
         prevacs[i] = prevac
 
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
         next_obs[i] = ob
@@ -381,7 +381,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / (0.5 * max_timesteps), 1e-8)
 
         else:
             raise NotImplementedError
