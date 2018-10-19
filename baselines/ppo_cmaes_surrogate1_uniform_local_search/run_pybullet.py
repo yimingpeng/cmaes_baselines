@@ -35,7 +35,7 @@ def train(env_id, num_timesteps, seed):
     env = make_pybullet_env(env_id, seed)
     # test_env = make_pybullet_env(env_id, seed)
     pposgd_simple.learn(env, policy_fn,
-                        max_fitness = max_fitness,  # has to be negative, we use minization
+                        max_fitness = max_fitness,  # has to be negative, we use minimization
                         popsize = popsize,
                         gensize = gensize,
                         bounds = bounds,
