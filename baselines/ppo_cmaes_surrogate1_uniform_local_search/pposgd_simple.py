@@ -16,6 +16,7 @@ test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
 mean_action_Condition = True
 
+
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
     ob = env.reset()
@@ -184,6 +185,7 @@ def uniform_select(weights, proportion):
         weights)), length, replace = False)
     return index, np.take(weights, index, axis = 0)
 
+
 def add_vtarg_and_adv(seg, gamma, lam):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
@@ -258,7 +260,7 @@ def learn(env, policy_fn, *,
     meanent = tf.reduce_mean(ent)
     pol_entpen = (-entcoeff) * meanent
 
-    ratio = tf.exp(pi.pd.logp(ac) - (oldpi.pd.logp(ac)+1e-8))  # pnew / pold
+    ratio = tf.exp(pi.pd.logp(ac) - (oldpi.pd.logp(ac) + 1e-8))  # pnew / pold
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
@@ -349,7 +351,8 @@ def learn(env, policy_fn, *,
                                            timesteps_per_actorbatch,
                                            stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq=eval_seq)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True,
+                                     eval_seq = eval_seq)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -399,7 +402,7 @@ def learn(env, policy_fn, *,
         # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         # cmean_adapted = max(0.8 - float(time˚steps_so_far) / (2*max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
-        # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:
             eval_seg = eval_seq.__next__()
@@ -425,17 +428,23 @@ def learn(env, policy_fn, *,
             segs["v_target"] = np.zeros(len(seg["ob"]), 'float32')
         elif len(segs["ob"]) >= 50000:
             segs["ob"] = np.take(segs["ob"], np.arange(timesteps_per_actorbatch, len(segs["ob"])), axis = 0)
-            segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])), axis = 0)
+            segs["next_ob"] = np.take(segs["next_ob"], np.arange(timesteps_per_actorbatch, len(segs["next_ob"])),
+                                      axis = 0)
             segs["ac"] = np.take(segs["ac"], np.arange(timesteps_per_actorbatch, len(segs["ac"])), axis = 0)
             segs["rew"] = np.take(segs["rew"], np.arange(timesteps_per_actorbatch, len(segs["rew"])), axis = 0)
             segs["vpred"] = np.take(segs["vpred"], np.arange(timesteps_per_actorbatch, len(segs["vpred"])), axis = 0)
-            segs["act_props"] = np.take(segs["act_props"], np.arange(timesteps_per_actorbatch, len(segs["act_props"])), axis = 0)
+            segs["act_props"] = np.take(segs["act_props"], np.arange(timesteps_per_actorbatch, len(segs["act_props"])),
+                                        axis = 0)
             segs["new"] = np.take(segs["new"], np.arange(timesteps_per_actorbatch, len(segs["new"])), axis = 0)
             segs["adv"] = np.take(segs["adv"], np.arange(timesteps_per_actorbatch, len(segs["adv"])), axis = 0)
-            segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])), axis = 0)
-            segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])), axis = 0)
-            segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])), axis = 0)
-            segs["v_target"] = np.take(segs["v_target"], np.arange(timesteps_per_actorbatch, len(segs["v_target"])), axis = 0)
+            segs["tdlamret"] = np.take(segs["tdlamret"], np.arange(timesteps_per_actorbatch, len(segs["tdlamret"])),
+                                       axis = 0)
+            segs["ep_rets"] = np.take(segs["ep_rets"], np.arange(timesteps_per_actorbatch, len(segs["ep_rets"])),
+                                      axis = 0)
+            segs["ep_lens"] = np.take(segs["ep_lens"], np.arange(timesteps_per_actorbatch, len(segs["ep_lens"])),
+                                      axis = 0)
+            segs["v_target"] = np.take(segs["v_target"], np.arange(timesteps_per_actorbatch, len(segs["v_target"])),
+                                       axis = 0)
             segs["ob"] = np.append(segs['ob'], seg['ob'], axis = 0)
             segs["next_ob"] = np.append(segs['next_ob'], seg['next_ob'], axis = 0)
             segs["ac"] = np.append(segs['ac'], seg['ac'], axis = 0)
@@ -472,7 +481,7 @@ def learn(env, policy_fn, *,
             for _ in range(max_v_train_iter):
                 for batch in d.iterate_once(optim_batchsize):
                     *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                                   cur_lrmult)
+                                                 cur_lrmult)
                     vf_adam.update(g, optim_stepsize * cur_lrmult)
                 # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
         else:
@@ -481,16 +490,18 @@ def learn(env, policy_fn, *,
             new = segs["new"]
             rew = segs["rew"]
             act_prob = np.asarray(compute_a_prob(segs["ob"], segs["ac"])).T
-            importance_ratio = np.squeeze(act_prob)/(segs["act_props"] + np.ones(segs["act_props"].shape)*1e-8)
-            segs["v_target"] = importance_ratio * (1/np.sum(importance_ratio)) * \
-                               np.squeeze(rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
+            importance_ratio = np.squeeze(act_prob) / (segs["act_props"] + np.ones(segs["act_props"].shape) * 1e-8)
+            segs["v_target"] = importance_ratio * (1 / np.sum(importance_ratio)) * \
+                               np.squeeze(
+                                   rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(segs["next_ob"]))
             # train_segs["v_target"] = rew + np.invert(new).astype(np.float32) * gamma * compute_v_pred(train_segs["next_ob"])
             if len(segs["ob"]) >= 20000:
                 train_times = int(max_v_train_iter / 2) if int(max_v_train_iter / 2) > 0 else 1
             else:
                 train_times = 2
             for i in range(train_times):
-                selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch, replace = False)
+                selected_train_index = np.random.choice(range(len(segs["ob"])), timesteps_per_actorbatch,
+                                                        replace = False)
                 train_segs["ob"] = np.take(segs["ob"], selected_train_index, axis = 0)
                 train_segs["next_ob"] = np.take(segs["next_ob"], selected_train_index, axis = 0)
                 train_segs["ac"] = np.take(segs["ac"], selected_train_index, axis = 0)
@@ -513,29 +524,27 @@ def learn(env, policy_fn, *,
                 for _ in range(max_v_train_iter):
                     for batch in d.iterate_once(optim_batchsize):
                         *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
-                                                       cur_lrmult)
+                                                     cur_lrmult)
                         vf_adam.update(g, optim_stepsize * cur_lrmult)
                     # logger.log(fmt_row(13, np.mean(vf_losses, axis = 0)))
                 # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
                 # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
                 # add_vtarg_and_adv(seg, gamma, lam)
 
-
             ob, ac, atarg, v_target = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
-            atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
-            d = Dataset(dict(ob = ob, ac = ac, atarg= atarg, vtarg = v_target), shuffle = not pi.recurrent)
+            atarg = (atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
+            d = Dataset(dict(ob = ob, ac = ac, atarg = atarg, vtarg = v_target), shuffle = not pi.recurrent)
             optim_batchsize = optim_batchsize or ob.shape[0]
             # Local search
             for _ in range(optim_epochs):
                 for batch in d.iterate_once(optim_batchsize):
                     *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult,
-                                                1)
+                                                1/4)
                     adam.update(g, optim_stepsize * cur_lrmult)
 
             # seg['vpred'] = np.asarray(compute_v_pred(seg["ob"])).reshape(seg['vpred'].shape)
             # seg['nextvpred'] = seg['vpred'][-1] * (1 - seg["new"][-1])
             # add_vtarg_and_adv(seg, gamma, lam)
-
 
         ob_po, ac_po, atarg_po, tdlamret_po = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
         atarg_po = (atarg_po - atarg_po.mean()) / atarg_po.std()  # standardized advantage function estimate
@@ -581,8 +590,7 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 4 * (i + 1))
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay

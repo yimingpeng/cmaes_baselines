@@ -159,8 +159,10 @@ def pybullet_arg_parser():
     parser = arg_parser()
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="AntBulletEnv-v0")
+    # parser.add_argument('--env', help='environment ID', type=str,
+    #                     default="InvertedPendulumSwingupBulletEnv-v0")
     parser.add_argument('--env', help='environment ID', type=str,
-                        default="InvertedPendulumSwingupBulletEnv-v0")
+                        default="Walker2DBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="HumanoidBulletEnv-v0")
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
