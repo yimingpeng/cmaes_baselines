@@ -285,7 +285,7 @@ def learn(env, policy_fn, *,
                 adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(newlosses)
             # logger.log(fmt_row(13, np.mean(losses, axis=0)))
-        logger.log("Current Iteration Training Performance:" + str(np.mean(seg["ep_rets"])))
+        # logger.log("Current Iteration Training Performance:" + str(np.mean(seg["ep_rets"])))
         # logger.log("Evaluating losses...")
         # losses = []
         # for batch in d.iterate_once(optim_batchsize):

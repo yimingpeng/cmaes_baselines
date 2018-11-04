@@ -116,7 +116,7 @@ register(
 	id='InvertedPendulumBulletEnv-v0',
 	entry_point='pybullet_envs.gym_pendulum_envs:InvertedPendulumBulletEnv',
 	max_episode_steps=1000,
-	reward_threshold=950.0,
+	reward_threshold=9500.0,
 	)
 
 register(

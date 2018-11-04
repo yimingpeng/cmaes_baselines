@@ -42,6 +42,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
             ep_num = 0
             cur_ep_ret = 0
             cur_ep_len = 0
+            ob = env.reset()
 
         ob, rew, new, _ = env.step(ac)
 
@@ -108,6 +109,8 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
             ep_lens = []
             index_count = 0
             traj_index = []
+            cur_ep_ret = 0
+            cur_ep_len = 0
 
         i = t % horizon
         obs[i] = ob
@@ -201,6 +204,23 @@ def uniform_select(weights, proportion):
     return index, np.take(weights, index, axis = 0)
 
 
+def add_vtarg_and_adv(seg, gamma, lam):
+    """
+    Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
+    """
+    new = np.append(seg["new"], 0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
+    vpred = np.append(seg["vpred"], seg["nextvpred"])
+    T = len(seg["rew"])
+    seg["adv"] = gaelam = np.empty(T, 'float32')
+    rew = seg["rew"]
+    lastgaelam = 0
+    for t in reversed(range(T)):
+        nonterminal = 1 - new[t + 1]
+        delta = rew[t] + gamma * vpred[t + 1] * nonterminal - vpred[t]
+        gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
+    seg["tdlamret"] = seg["adv"] + seg["vpred"]
+
+
 def learn(env, policy_fn, *,
           timesteps_per_actorbatch,  # timesteps per actor per update
           clip_param, entcoeff,  # clipping parameter epsilon, entropy coeff
@@ -258,7 +278,7 @@ def learn(env, policy_fn, *,
     meanent = tf.reduce_mean(ent)
     pol_entpen = (-entcoeff) * meanent
 
-    ratio = tf.exp(pi.pd.logp(ac) - (oldpi.pd.logp(ac)+1e-8))  # pnew / pold
+    ratio = tf.exp(pi.pd.logp(ac) - (oldpi.pd.logp(ac) + 1e-8))  # pnew / pold
     surr1 = ratio * atarg  # surrogate from conservative policy iteration
     surr2 = tf.clip_by_value(ratio, 1.0 - clip_param, 1.0 + clip_param) * atarg  #
     pol_surr = - tf.reduce_mean(tf.minimum(surr1, surr2))  # PPO's pessimistic surrogate (L^CLIP)
@@ -347,7 +367,8 @@ def learn(env, policy_fn, *,
                                            timesteps_per_actorbatch,
                                            stochastic = False)
     # eval_gen = traj_segment_generator_eval(pi, test_env, timesteps_per_actorbatch, stochastic = True)  # For evaluation
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True, eval_seq=eval_seq)  # For train V Func
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic = True,
+                                     eval_seq = eval_seq)  # For train V Func
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
@@ -385,8 +406,7 @@ def learn(env, policy_fn, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult = max(1.0 - float(timesteps_so_far) / ( max_timesteps), 0)
-
+            cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps), 0)
         else:
             raise NotImplementedError
 
@@ -398,7 +418,7 @@ def learn(env, policy_fn, *,
         # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         # cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
-        # max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:
             eval_seg = eval_seq.__next__()
@@ -572,8 +592,8 @@ def learn(env, policy_fn, *,
                 for id, solution in enumerate(solutions):
                     np.put(flatten_weights, selected_index, solution)
                     layer_set_operate_list[i](flatten_weights)
-                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 3 * (i + 1))
-                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
+                    cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1 / 3 * (i + 1))
+                    # cost = compute_pol_losses(ob_po, ac_po, atarg_po, tdlamret_po, cur_lrmult, 1.0)
                     costs.append(cost[0])
                     assign_new_eq_backup()
                 # Weights decay
