@@ -20,7 +20,7 @@ def train(env_id, num_timesteps, seed):
     gensize = 100  # For each iterations
     max_v_train_iter = 10
     bounds = [-5.0, 5.0]
-    sigma = 3e-4
+    sigma = 15e-5
     eval_iters = 1
     from baselines.ppo_cmaes_surrogate1_uniform import mlp_policy, pposgd_simple
     U.make_session(num_cpu = 1).__enter__()
@@ -52,7 +52,7 @@ def train(env_id, num_timesteps, seed):
 def main():
     args = gym_ctrl_arg_parser().parse_args()
     logger.configure(format_strs = ['stdout', 'log', 'csv'],
-                     log_suffix = "PES-S2" + args.env + "_seed_" + str(args.seed))
+                     log_suffix = "PES-S2-" + args.env + "_seed_" + str(args.seed))
     logger.log("Algorithm: PES-S2-" + args.env + "_seed_" + str(args.seed))
     train(args.env, num_timesteps = args.num_timesteps, seed = args.seed)
 
