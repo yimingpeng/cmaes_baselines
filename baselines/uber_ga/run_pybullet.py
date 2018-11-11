@@ -24,7 +24,7 @@ def train(env_id, num_timesteps, seed):
     popsize = 129
     gensize = 10000
     truncation_size = 20
-    sigma = 0.002
+    sigma = 0.1
     eval_iters = 1
     from baselines.uber_ga import mlp_policy, ga_simple
     U.make_session(num_cpu=1).__enter__()
