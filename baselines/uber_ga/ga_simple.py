@@ -128,6 +128,7 @@ def result_record():
         episodes_so_far, tstart,best_fitness
     # if best_fitness != -np.inf:
     #     rewbuffer.append(best_fitness)
+    print(rewbuffer)
     if len(lenbuffer) == 0:
         mean_lenbuffer = 0
     else:
@@ -230,6 +231,9 @@ def learn(base_env,
 
         assign_backup_eq_new() # backup current policy
 
+
+        cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
+
         logger.log("********** Generation %i ************" % iters_so_far)
         eval_seg = seg_gen.__next__()
         rewbuffer.extend(eval_seg["ep_rets"])
@@ -247,7 +251,7 @@ def learn(base_env,
             else:
                 if i != 0:
                     k = np.random.randint(truncation_size)
-                    pop["solutions"][i] = pop["parents"][k] + sigma * np.random.randn(1, indv_len)
+                    pop["solutions"][i] = pop["parents"][k] + sigma * cur_lrmult * np.random.randn(1, indv_len)
                     pi_set_from_flat_params(pop["solutions"][i])
                     seg = actors[i].__next__()
                     pop["fitness"][i] = np.mean(seg["ep_rets"])
@@ -272,8 +276,8 @@ def learn(base_env,
 
         gen_counter += 1
         iters_so_far += 1
-        if sigma >= 1e-8:
-            sigma *= 0.999
+        # if sigma >= 1e-8:
+        #     sigma *= 0.999
 
 def compute_weight_decay(weight_decay, model_param_list):
     model_param_grid = np.array(model_param_list)
