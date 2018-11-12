@@ -20,7 +20,7 @@ def train(env_id, num_timesteps, seed):
     gensize = 100000
     alpha = 0.01
     sigma = 0.1
-    eval_iters = 3
+    eval_iters = 1
     from baselines.openai_es import mlp_policy, es_simple
     U.make_session(num_cpu=1).__enter__()
 
