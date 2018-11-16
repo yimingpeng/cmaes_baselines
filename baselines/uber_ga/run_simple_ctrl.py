@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Add the current folder to PYTHONPATH by Yiming
+import inspect
 import os
 import sys
 
@@ -7,6 +8,11 @@ sys.path.append(
     os.path.abspath(
         os.path.join(
             os.path.abspath(os.path.join(os.getcwd(), os.pardir)), os.pardir)))
+
+currentdir = os.path.dirname(
+    os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(os.path.dirname(currentdir))
+os.sys.path.insert(0, parentdir)
 
 from baselines.common.cmd_util import gym_ctrl_arg_parser, \
     make_gym_control_env
