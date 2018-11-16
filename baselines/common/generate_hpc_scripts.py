@@ -16,13 +16,11 @@ import os
 
 
 f = open("../../hpc_scripts/template.sl")
-algorithms = ["PPO", "CMAES", "CMAES_Layer_Entire",
-              "CMAES_Layer_uniform", "DDPG",
-              "ACKTR", "openai_es", "uber_ga",
-              "TRPO", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
+algorithms = ["PPO", "CMAES",
+              "CMAES_Layer_uniform","openai_es", "uber_ga", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
 bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
                    "InvertedPendulum", "InvertedPendulumSwingup",
-                   "Walker2D"]
+                   "Walker2D", "Reacher"]
 gym_problems = ["LunarLanderContinuous", "BipedalWalker", "BipedalWalkerHardcore"]
 seeds = range(5)
 # Generate for Bullet problems
@@ -92,3 +90,17 @@ for algorithm in algorithms:
     # f3.close()
     # f2.seek(0)
 f.close()
+
+
+import glob
+from functools import reduce
+
+all_list = []
+for algorithm in algorithms:
+    all_files = glob.glob("../../hpc_scripts/" + algorithm + "/*.sl")
+    all_list.extend(list(map(lambda x: "".join(["sbatch ./",x.split("/")[-2], "/", x.split("/")[-1]]), all_files)))
+# new_list = reduce(lambda x,y:x.extend(y), all_list)
+command = reduce(lambda x,y: "".join([x, "\n", y]), all_list)
+with open("../../hpc_scripts/run.sh", "w") as f3:
+    command = reduce(lambda x,y: "".join([x, "\n", y]), all_list)
+    f3.write(command)
