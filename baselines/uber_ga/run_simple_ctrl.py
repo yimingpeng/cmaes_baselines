@@ -52,7 +52,9 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = gym_ctrl_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env)
+
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env+"_seed_"+str(args.seed))
+    logger.log("Algorithm: PES-" + args.env + "_seed_" + str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
