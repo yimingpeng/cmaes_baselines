@@ -77,7 +77,7 @@ for algorithm in algorithms:
                 if algorithm == "DDPG":
                     line = line.replace("run_pybullet.py", "main.py")
                 else:
-                    line = 'pyName="run_gym_ctrl.py"'
+                    line = 'pyName="run_simple_ctrl.py"'
             if "$experimentFolder/$experimentName/ppo1/" in line:
                 line = "cd $experimentFolder/$experimentName/" + algorithm.lower() + "/\n"
             if "BipedalWalker-v2" in line:
