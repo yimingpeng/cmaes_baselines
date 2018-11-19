@@ -89,7 +89,7 @@ cp -r /vol/grid-solar/sgeusers/yimingpeng/$experimentFolder .
 # cd into repo
 #
 echo ==GOING INTO EXPERIMENT DIRECTORY==
-cd $experimentFolder/$experimentName/ppo_cmaes_surrogate1_uniform_local_search/
+cd $experimentFolder/$experimentName/ppo1/
 
 #
 # Run experiment

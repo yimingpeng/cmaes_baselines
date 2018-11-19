@@ -90,7 +90,7 @@ cp -r /vol/grid-solar/sgeusers/yimingpeng/$experimentFolder .
 # cd into repo
 #
 echo ==GOING INTO EXPERIMENT DIRECTORY==
-cd $experimentFolder/$experimentName/openai_es/
+cd $experimentFolder/$experimentName/ppo1/
 
 #
 # Run experiment
