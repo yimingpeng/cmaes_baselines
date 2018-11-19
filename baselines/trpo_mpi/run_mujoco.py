@@ -3,7 +3,7 @@
 from mpi4py import MPI
 from baselines.common.cmd_util import make_mujoco_env, mujoco_arg_parser
 from baselines import logger
-from baselines.ppo1.mlp_policy import MlpPolicy
+from baselines.ppo.mlp_policy import MlpPolicy
 from baselines.trpo_mpi import trpo_mpi
 
 def train(env_id, num_timesteps, seed):
