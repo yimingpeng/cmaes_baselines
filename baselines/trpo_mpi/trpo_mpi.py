@@ -10,7 +10,50 @@ from baselines.common.mpi_adam import MpiAdam
 from baselines.common.cg import cg
 from contextlib import contextmanager
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator_eval(pi, env, horizon, stochastic):
+    t = 0
+    ob = env.reset()
+
+    cur_ep_ret = 0  # return in current episode
+    cur_ep_len = 0  # len of current episode
+    ep_rets = []  # returns of completed episodes in this segment
+    ep_lens = []  # lengths of ...
+    ep_num = 0
+    while True:
+        ac, vpred = pi.act(stochastic, ob)
+        # ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        # Slight weirdness here because we need value function at time T
+        # before returning segment [0, T-1] so we get the correct
+        # terminal value
+        if t > 0 and t % horizon == 0 and ep_num >= 5:
+            yield {"ep_rets": ep_rets, "ep_lens": ep_lens}
+            # Be careful!!! if you change the downstream algorithm to aggregate
+            # several of these batches, then be sure to do a deepcopy
+            ep_rets = []
+            ep_lens = []
+            ep_num = 0
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
+
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        # if env.spec._env_name == "LunarLanderContinuous":
+        #     ac = np.clip(ac, -1.0, 1.0)
+        ob, rew, new, _ = env.step(ac)
+
+        cur_ep_ret += rew
+        cur_ep_len += 1
+        if new:
+            ep_num += 1
+            ep_rets.append(cur_ep_ret)
+            ep_lens.append(cur_ep_len)
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            ob = env.reset()
+        t += 1
+
+def traj_segment_generator(pi, env, horizon, stochastic, eval_seq):
+    global timesteps_so_far, rewbuffer, lenbuffer
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
@@ -31,13 +74,24 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     acs = np.array([ac for _ in range(horizon)])
     prevacs = acs.copy()
 
+    record = False
     while True:
+        if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
+            record = True
+            # result_record()
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
+            if record:
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens}
@@ -53,18 +107,49 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         acs[i] = ac
         prevacs[i] = prevac
 
+        ac = np.clip(ac, env.action_space.low, env.action_space.high)
         ob, rew, new, _ = env.step(ac)
         rews[i] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
+        timesteps_so_far += 1
         if new:
+            if record:
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
         t += 1
+
+def result_record():
+    global lenbuffer, rewbuffer, iters_so_far, timesteps_so_far, \
+        episodes_so_far, tstart
+    # print(np.random.get_state()[1][0])
+    print(rewbuffer)
+    if len(lenbuffer) == 0:
+        mean_lenbuffer = 0
+    else:
+        mean_lenbuffer = np.mean(lenbuffer)
+    if len(rewbuffer) == 0:
+        # TODO: Add pong game checking
+        mean_rewbuffer = 0
+    else:
+        mean_rewbuffer = np.mean(rewbuffer)
+    logger.record_tabular("EpLenMean", mean_lenbuffer)
+    logger.record_tabular("EpRewMean", mean_rewbuffer)
+    logger.record_tabular("EpisodesSoFar", episodes_so_far)
+    logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+    logger.record_tabular("TimeElapsed", time.time() - tstart)
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        logger.dump_tabular()
 
 def add_vtarg_and_adv(seg, gamma, lam):
     new = np.append(seg["new"], 0) # last element is only used for last vtarg, but we already zeroed it if last new = 1
@@ -174,8 +259,11 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True)
+    eval_seq = traj_segment_generator_eval(pi, env, timesteps_per_batch, stochastic = False)
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True, eval_seq=eval_seq)
 
+    global timesteps_so_far, episodes_so_far, iters_so_far, \
+        tstart, lenbuffer, rewbuffer, best_fitness
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
@@ -193,7 +281,12 @@ def learn(env, policy_fn, *,
             break
         elif max_iters and iters_so_far >= max_iters:
             break
-        logger.log("********** Iteration %i ************"%iters_so_far)
+        logger.log("********** Iteration %i ************" % iters_so_far)
+        if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
+            result_record()
 
         with timed("sampling"):
             seg = seg_gen.__next__()
@@ -254,8 +347,8 @@ def learn(env, policy_fn, *,
                 paramsums = MPI.COMM_WORLD.allgather((thnew.sum(), vfadam.getflat().sum())) # list of tuples
                 assert all(np.allclose(ps, paramsums[0]) for ps in paramsums[1:])
 
-        for (lossname, lossval) in zip(loss_names, meanlosses):
-            logger.record_tabular(lossname, lossval)
+        # for (lossname, lossval) in zip(loss_names, meanlosses):
+        #     logger.record_tabular(lossname, lossval)
 
         with timed("vf"):
             for _ in range(vf_iters):
@@ -264,27 +357,27 @@ def learn(env, policy_fn, *,
                     g = allmean(compute_vflossandgrad(mbob, mbret))
                     vfadam.update(g, vf_stepsize)
 
-        logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
-
-        lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
-        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
-
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-        logger.record_tabular("EpThisIter", len(lens))
-        episodes_so_far += len(lens)
-        timesteps_so_far += sum(lens)
+        # logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
+        #
+        # lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
+        # listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
+        # lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        # lenbuffer.extend(lens)
+        # rewbuffer.extend(rews)
+        #
+        # logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+        # logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+        # logger.record_tabular("EpThisIter", len(lens))
+        # episodes_so_far += len(lens)
+        # timesteps_so_far += sum(lens)
         iters_so_far += 1
 
-        logger.record_tabular("EpisodesSoFar", episodes_so_far)
-        logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-        logger.record_tabular("TimeElapsed", time.time() - tstart)
+        # logger.record_tabular("EpisodesSoFar", episodes_so_far)
+        # logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+        # logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        if rank==0:
-            logger.dump_tabular()
+        # if rank==0:
+        #     logger.dump_tabular()
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
