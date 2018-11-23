@@ -1,0 +1,12 @@
+#! /bin/bash
+bash CMAES_Layer_uniform_MountainCarContinuous.sh
+bash CMAES_Layer_uniform_InvertedDoublePendulum.sh
+bash CMAES_Layer_uniform_InvertedPendulum.sh
+bash CMAES_Layer_uniform_InvertedPendulumSwingup.sh
+bash CMAES_Layer_uniform_BipedalWalker.sh
+bash CMAES_Layer_uniform_LunarLanderContinuous.sh
+
+
+
+
+

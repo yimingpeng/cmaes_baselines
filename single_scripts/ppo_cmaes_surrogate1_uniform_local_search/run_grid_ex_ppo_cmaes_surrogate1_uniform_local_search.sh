@@ -1,0 +1,12 @@
+#! /bin/bash
+bash ppo_cmaes_surrogate1_uniform_local_search_MountainCarContinuous.sh
+bash ppo_cmaes_surrogate1_uniform_local_search_InvertedDoublePendulum.sh
+bash ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulum.sh
+bash ppo_cmaes_surrogate1_uniform_local_search_InvertedPendulumSwingup.sh
+bash ppo_cmaes_surrogate1_uniform_local_search_BipedalWalker.sh
+bash ppo_cmaes_surrogate1_uniform_local_search_LunarLanderContinuous.sh
+
+
+
+
+
