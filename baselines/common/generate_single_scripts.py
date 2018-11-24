@@ -84,7 +84,7 @@ for algorithm in algorithms:
                 if algorithm == "DDPG":
                     line = "\t( python $pyName --env-id " + problem + "-v0" + " --seed $i &> "+ problem +"_\"$i\".out)\n"
                 else:
-                    if problem == "LunarLanderContinuous" or problem == "BipedalWalker":
+                    if problem == "LunarLanderContinuous" or problem == "BipedalWalker" or problem == "BipedalWalkerHardcore":
                         line = "\t( python $pyName --env " + problem + "-v2" + " --seed $i &> "+ problem +"_\"$i\".out)\n"
                     else:
                         line = "\t( python $pyName --env " + problem + "-v0" + " --seed $i &> "+ problem +"_\"$i\".out)\n"
