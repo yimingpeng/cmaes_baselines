@@ -62,7 +62,7 @@ def traj_segment_generator_eval(pi, env, horizon, stochastic):
         t += 1
 
 
-def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
+def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, eval_seq):
     global timesteps_so_far
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -81,15 +81,23 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
     acs = np.array([ac for _ in range(horizon)])
     prevacs = acs.copy()
     ep_num = 0
+    record = False
     while True:
         if timesteps_so_far % 10000 == 0 and timesteps_so_far > 0:
-            result_record()
+            record = True
         prevac = ac
         ac = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if (t > 0 and t % horizon == 0) or ep_num >= eval_iters:
+            if record:
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             yield {"ob": obs, "rew": rews, "new": news,
                    "ac": acs, "prevac": prevacs,
                    "ep_rets": ep_rets, "ep_lens": ep_lens}
@@ -114,6 +122,13 @@ def traj_segment_generator(pi, env, horizon, stochastic, eval_iters, seg_gen):
         cur_ep_len += 1
         timesteps_so_far += 1
         if new:
+            if record:
+                ob = env.reset()
+                eval_seg = eval_seq.__next__()
+                rewbuffer.extend(eval_seg["ep_rets"])
+                lenbuffer.extend(eval_seg["ep_lens"])
+                result_record()
+                record = False
             ep_num += 1
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
@@ -166,6 +181,7 @@ def learn(base_env,
     ob_space = base_env.observation_space
     ac_space = base_env.action_space
     pi = policy_fn("pi", ob_space, ac_space)  # Construct network for new policy
+    best_pi = policy_fn("best_pi", ob_space, ac_space)  # Construct network for new policy
     backup_pi = policy_fn("backup_pi", ob_space, ac_space)  # Construct a network for every individual to adapt during the es evolution
 
     U.initialize()
@@ -189,20 +205,23 @@ def learn(base_env,
                                                       for (newv, backup_v) in zipsame(
             pi.get_variables(), backup_pi.get_variables())])
 
+    assign_best_eq_pi = U.function([], [], updates = [tf.assign(bestv, newv)
+                                                      for (bestv, newv) in zipsame(
+            best_pi.get_variables(), pi.get_variables())])
+
 
     assert sum([max_iters > 0, max_timesteps > 0, max_episodes > 0,
                 max_seconds > 0]) == 1, "Only one time constraint permitted"
 
     # Build generator for all solutions
-    global seg_gen
-    seg_gen = traj_segment_generator_eval(pi, base_env, timesteps_per_actorbatch, stochastic=True)
+    eval_seq = traj_segment_generator_eval(best_pi, base_env, timesteps_per_actorbatch, stochastic=False)
     actors = []
     best_fitness = 0
     for i in range(popsize):
         newActor = traj_segment_generator(pi, base_env,
                                           timesteps_per_actorbatch,
-                                          stochastic = True,
-                                          eval_iters = eval_iters, seg_gen=seg_gen)
+                                          stochastic = False,
+                                          eval_iters = eval_iters, eval_seq=eval_seq)
         actors.append(newActor)
 
     flatten_weights = pi_get_flat_params()
@@ -230,28 +249,30 @@ def learn(base_env,
             break
 
         assign_backup_eq_new() # backup current policy
+        assign_best_eq_pi() #get the best pi equal to current pi
 
 
         cur_lrmult = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
 
         logger.log("********** Generation %i ************" % iters_so_far)
-        eval_seg = seg_gen.__next__()
-        rewbuffer.extend(eval_seg["ep_rets"])
-        lenbuffer.extend(eval_seg["ep_lens"])
         if iters_so_far == 0:
+            eval_seg = eval_seq.__next__()
+            rewbuffer.extend(eval_seg["ep_rets"])
+            lenbuffer.extend(eval_seg["ep_lens"])
             result_record()
 
         ob_segs = None
         for i in range(popsize):
             # First generation
             if gen_counter == 0:
+                pop["solutions"][i] = flatten_weights + sigma*cur_lrmult * np.random.normal(0.0, 1.0, indv_len)
                 pi_set_from_flat_params(pop["solutions"][i])
                 seg = actors[i].__next__()
                 pop["fitness"][i] = np.mean(seg["ep_rets"])
             else:
                 if i != 0:
-                    k = np.random.randint(truncation_size)
-                    pop["solutions"][i] = pop["parents"][k] + sigma * cur_lrmult * np.random.randn(1, indv_len)
+                    k = np.random.randint(1, truncation_size)
+                    pop["solutions"][i] = pop["parents"][k] + sigma*cur_lrmult * np.random.normal(0.0, 1.0, indv_len)
                     pi_set_from_flat_params(pop["solutions"][i])
                     seg = actors[i].__next__()
                     pop["fitness"][i] = np.mean(seg["ep_rets"])
@@ -261,14 +282,15 @@ def learn(base_env,
             else:
                 ob_segs['ob'] = np.append(ob_segs['ob'], seg['ob'], axis=0)
             assign_new_eq_backup()
+
+        pop["fitness"], real_costs = fitness_normalization(pop["fitness"])
         fit_idx = pop["fitness"].flatten().argsort()[::-1][:popsize]
         pop["solutions"] = pop["solutions"][fit_idx]
         pop["parents"] = pop["solutions"][:, truncation_size]
         pop["fitness"] = pop["fitness"][fit_idx]
         # print(pop["fitness"])
         # pop["fitness"], real_fitness = fitness_normalization(pop["fitness"][fit_idx])
-        logger.log("Generation:", gen_counter)
-        logger.log("Best Solution Fitness:", pop["fitness"][0])
+        # logger.log("Best Solution Fitness:", pop["fitness"][0])
         pi_set_from_flat_params(pop["solutions"][0])
 
         ob = ob_segs["ob"]

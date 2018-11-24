@@ -25,7 +25,7 @@ else:
     f2 = open("../../single_scripts/run_grid_ex_template.sh")
 algorithms = ["PPO", "CMAES",
               "CMAES_Layer_uniform", "DDPG",
-              "ACKTR", "openai_es", "uber_ga",
+              "ACKTR", "openai_es", "uber_ga_original",
               "TRPO", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
 bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
                    "InvertedPendulum", "InvertedPendulumSwingup", "Reacher",

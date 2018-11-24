@@ -87,7 +87,7 @@ def make_gym_control_env(env_id, seed):
     Added by Yiming (29/5/2018)
     Create a wrapped, monitored gym.Env for Simple Control Problems.
     """
-    set_global_seeds(seed+100)
+    set_global_seeds(seed)
     env = gym.make(env_id)
     # env = Monitor(env, logger.get_dir(), allow_early_resets=True)
     env.seed(seed)
@@ -102,7 +102,7 @@ def make_pybullet_env(env_id, seed):
     # import numpy as np
     # print(np.random.get_state()[1][0])
     # pybullet.connect(None)
-    set_global_seeds(seed+100)
+    set_global_seeds(seed)
     env = gym.make(env_id)
     # env = Monitor(env, logger.get_dir(),allow_early_resets=True)
     # env = InvertedDoublePendulumBulletEnv()
@@ -177,10 +177,12 @@ def pybullet_arg_parser():
     parser = arg_parser()
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="AntBulletEnv-v0")
+    parser.add_argument('--env', help='environment ID', type=str,
+                        default="InvertedDoublePendulumBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="InvertedPendulumSwingupBulletEnv-v0")
-    parser.add_argument('--env', help = 'environment ID', type = str,
-                        default = "InvertedPendulumBulletEnv-v0")
+    # parser.add_argument('--env', help = 'environment ID', type = str,
+    #                     default = "InvertedPendulumBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="Walker2DBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,

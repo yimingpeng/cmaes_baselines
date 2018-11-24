@@ -17,7 +17,7 @@ import os
 
 f = open("../../hpc_scripts/template.sl")
 algorithms = ["PPO", "CMAES",
-              "CMAES_Layer_uniform","openai_es", "uber_ga", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
+              "CMAES_Layer_uniform","openai_es", "uber_ga_original", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
 bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
                    "InvertedPendulum", "InvertedPendulumSwingup",
                    "Walker2D", "Reacher"]

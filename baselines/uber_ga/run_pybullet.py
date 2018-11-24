@@ -21,9 +21,9 @@ from baselines import logger
 
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
-    popsize = 33
+    popsize = 101
     gensize = 10000
-    truncation_size = 10
+    truncation_size = 20
     sigma = 0.1
     eval_iters = 1
     from baselines.uber_ga import mlp_policy, ga_simple
@@ -51,8 +51,8 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     args = pybullet_arg_parser().parse_args()
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env+"_seed_"+str(args.seed))
-    logger.log("Algorithm: PES-" + args.env + "_seed_" + str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "Uber-GA-"+args.env+"_seed_"+str(args.seed))
+    logger.log("Algorithm: Uber-GA-" + args.env + "_seed_" + str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
