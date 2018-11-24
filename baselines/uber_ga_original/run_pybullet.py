@@ -40,8 +40,8 @@ def main():
 
     args = pybullet_arg_parser().parse_args()
 
-    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "UberGA-"+args.env+"_seed_"+str(args.seed))
-    logger.log("Algorithm:UberGA-" + args.env + "_seed_" + str(args.seed))
+    logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "Uber-GA-"+args.env+"_seed_"+str(args.seed))
+    logger.log("Algorithm:Uber-GA-" + args.env + "_seed_" + str(args.seed))
     env_id = args.env
     seed = args.seed
     with make_session() as sess:
