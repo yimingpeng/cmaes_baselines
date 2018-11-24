@@ -187,7 +187,7 @@ class LearningSession:
                 obs = env.reset()
                 record = False
                 while not done:
-                    if self.timesteps_so_far  % 10000 == 0:
+                    if self.timesteps_so_far % 10000 == 0:
                         record = True
                     if step_fn:
                         step_fn()
@@ -197,13 +197,13 @@ class LearningSession:
                     total_rew += rew
                     self.timesteps_so_far += 1
                 if record:
-                    eval_seg = eval_seq.__next__()
-                    self.rewbuffer.extend(eval_seg["ep_rets"])
-                    self.lenbuffer.extend(eval_seg["ep_lens"])
+                    self.rewbuffer.extend(rewards)
+                    self.lenbuffer.extend(rewards)
                     self.result_record()
                     record = False
                 rewards.append(total_rew)
                 self.episodes_so_far += 1
+            # print(self.timesteps_so_far)
             return sum(rewards) / len(rewards)
 
     def _select(self, children, select_kwargs):

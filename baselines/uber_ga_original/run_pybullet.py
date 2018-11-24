@@ -52,8 +52,8 @@ def main():
             learn_sess = LearningSession(sess, model)
             while True:
                 pop = learn_sess.generation(env, trials=5, population=POPULATION)
-                rewards = [x[0] for x in pop]
-                print('mean=%f best=%s' % (sum(rewards)/len(rewards), str(rewards[:10])))
+                # rewards = [x[0] for x in pop]
+                # print('mean=%f best=%s' % (sum(rewards)/len(rewards), str(rewards[:10])))
         finally:
             env.close()
 
