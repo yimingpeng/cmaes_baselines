@@ -26,7 +26,7 @@ from mpi4py import MPI
 import tensorflow as tf
 import numpy as np
 import time
-import logger
+from baselines import logger
 from .noise import NoiseSource, NoiseAdder, noise_seed
 from .selection import truncation_selection
 from collections import deque
