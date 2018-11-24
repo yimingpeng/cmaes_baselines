@@ -4,7 +4,7 @@ experimentName="baselines"
 
 pyName="run_pybullet.py"
 
-cd ../../$experimentName/trpo/
+cd ../../$experimentName/trpo_mpi/
 
 for i in {0..5}
 do
