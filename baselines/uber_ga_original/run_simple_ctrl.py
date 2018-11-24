@@ -12,7 +12,7 @@ sample efficiency.
 import gym
 import tensorflow as tf
 
-import logger
+from baselines import logger
 from baselines.uber_ga_original import LearningSession, simple_mlp, make_session
 from common.cmd_util import make_gym_control_env, gym_ctrl_arg_parser
 
