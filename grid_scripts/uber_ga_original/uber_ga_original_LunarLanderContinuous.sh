@@ -89,7 +89,7 @@ cp -r /vol/grid-solar/sgeusers/yimingpeng/$experimentFolder .
 # cd into repo
 #
 echo ==GOING INTO EXPERIMENT DIRECTORY==
-cd $experimentFolder/$experimentName/ppo1/
+cd $experimentFolder/$experimentName/uber_ga_original/
 
 #
 # Run experiment
