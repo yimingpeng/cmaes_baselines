@@ -89,13 +89,13 @@ cp -r /vol/grid-solar/sgeusers/yimingpeng/$experimentFolder .
 # cd into repo
 #
 echo ==GOING INTO EXPERIMENT DIRECTORY==
-cd $experimentFolder/$experimentName/trpo/
+cd $experimentFolder/$experimentName/trpo_mpi/
 
 #
 # Run experiment
 #
 echo ==RUNNING EXPERIMENT==
-python $pyName --env BipedalWalker-v2 --seed $SGE_TASK_ID
+python $pyName --env LunarLanderContinuous-v2 --seed $SGE_TASK_ID
 #
 echo ==AND NOW, HAVING DONE SOMTHING USEFUL AND CREATED SOME OUTPUT==
 ls -la
