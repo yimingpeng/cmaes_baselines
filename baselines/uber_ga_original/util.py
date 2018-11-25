@@ -17,7 +17,7 @@ def make_session():
 
     Sessions on different workers may share GPUs.
     """
-    _setup_mpi_gpus()
+    # _setup_mpi_gpus()
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     return tf.Session(config=config)
