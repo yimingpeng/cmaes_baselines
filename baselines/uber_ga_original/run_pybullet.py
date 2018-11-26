@@ -45,6 +45,7 @@ def main():
     env_id = args.env
     seed = args.seed
     generation = 0
+    timesteps_so_far = 0
     with make_session() as sess:
         env = make_pybullet_env(env_id, seed)
         try:
