@@ -44,6 +44,7 @@ def main():
     logger.log("Algorithm:Uber-GA-" + args.env + "_seed_" + str(args.seed))
     env_id = args.env
     seed = args.seed
+    generation = 0
     with make_session() as sess:
         env = make_pybullet_env(env_id, seed)
         try:
@@ -51,7 +52,10 @@ def main():
             sess.run(tf.global_variables_initializer())
             learn_sess = LearningSession(sess, model)
             while True:
-                pop = learn_sess.generation(env, trials=5, population=POPULATION)
+                if generation >= 10000 or timesteps_so_far >= 5e6:
+                    break
+                pop, timesteps_so_far = learn_sess.generation(env, trials=5, population=POPULATION)
+                generation +=1
                 # rewards = [x[0] for x in pop]
                 # print('mean=%f best=%s' % (sum(rewards)/len(rewards), str(rewards[:10])))
         finally:
