@@ -1,0 +1,12 @@
+#! /bin/bash
+bash ppo_cmaes_surrogate1_uniform_original_MountainCarContinuous.sh
+bash ppo_cmaes_surrogate1_uniform_original_InvertedDoublePendulum.sh
+bash ppo_cmaes_surrogate1_uniform_original_InvertedPendulum.sh
+bash ppo_cmaes_surrogate1_uniform_original_InvertedPendulumSwingup.sh
+bash ppo_cmaes_surrogate1_uniform_original_BipedalWalker.sh
+bash ppo_cmaes_surrogate1_uniform_original_LunarLanderContinuous.sh
+
+
+
+
+

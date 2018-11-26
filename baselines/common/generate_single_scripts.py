@@ -26,7 +26,7 @@ else:
 algorithms = ["PPO", "CMAES",
               "CMAES_Layer_uniform", "DDPG",
               "ACKTR", "openai_es", "uber_ga_original",
-              "trpo_mpi", "ppo_cmaes_surrogate1_uniform", "ppo_cmaes_surrogate1_uniform_local_search"]
+              "trpo_mpi", "ppo_cmaes_surrogate1_uniform_original", "ppo_cmaes_surrogate1_uniform_local_search"]
 bullet_problems = ["HalfCheetah", "Hopper", "InvertedDoublePendulum",
                    "InvertedPendulum", "InvertedPendulumSwingup", "Reacher",
                    "Walker2D"]
