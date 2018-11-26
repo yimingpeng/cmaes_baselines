@@ -29,6 +29,8 @@ def main():
     logger.log("Algorithm:UberGA-" + args.env + "_seed_" + str(args.seed))
     env_id = args.env
     seed = args.seed
+    generation = 0
+    timesteps_so_far = 0
     with make_session() as sess:
         env = make_gym_control_env(env_id, seed)
         try:
@@ -36,9 +38,9 @@ def main():
             sess.run(tf.global_variables_initializer())
             learn_sess = LearningSession(sess, model)
             while True:
+                if generation >= 10000 or timesteps_so_far >= 5e6:
+                    break
                 pop = learn_sess.generation(env, trials=5, population=POPULATION)
-                rewards = [x[0] for x in pop]
-                print('mean=%f best=%s' % (sum(rewards)/len(rewards), str(rewards[:10])))
         finally:
             env.close()
 
