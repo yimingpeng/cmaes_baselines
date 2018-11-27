@@ -38,7 +38,7 @@ class LearningSession:
     def __init__(self, session, model, noise=None, selection=truncation_selection):
         self.session = session
         self.model = model
-        self.generation = 0
+        self.population = None
         self.selection = selection
         self._noise_adder = NoiseAdder(self.session, self.model.variables, noise or NoiseSource())
 
@@ -107,7 +107,7 @@ class LearningSession:
         full_res = [x for batch in MPI.COMM_WORLD.allgather(res) for x in batch]
         self.population = sorted(full_res, reverse=True)
         self.generation+=1
-        return self.population, self.timesteps_so_far
+        return self.population
 
     def traj_segment_generator_eval(self, env, horizon):
         import numpy as np

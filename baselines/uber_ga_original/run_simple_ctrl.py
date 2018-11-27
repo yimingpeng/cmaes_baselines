@@ -30,7 +30,6 @@ def main():
     env_id = args.env
     seed = args.seed
     generation = 0
-    timesteps_so_far = 0
     with make_session() as sess:
         env = make_gym_control_env(env_id, seed)
         try:
@@ -38,9 +37,10 @@ def main():
             sess.run(tf.global_variables_initializer())
             learn_sess = LearningSession(sess, model)
             while True:
-                if generation >= 10000 or timesteps_so_far >= 5e6:
+                if generation >= 10000 or learn_sess.timesteps_so_far >= 5e6:
                     break
                 pop = learn_sess.generation(env, trials=5, population=POPULATION)
+                generation+=1
         finally:
             env.close()
 
