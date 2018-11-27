@@ -31,7 +31,7 @@ from baselines import logger
 from baselines.uber_ga_original import LearningSession, simple_mlp, make_session
 from baselines.common.cmd_util import  make_pybullet_env, pybullet_arg_parser
 
-POPULATION = 10
+POPULATION = 32
 
 def main():
     """
