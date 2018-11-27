@@ -106,7 +106,6 @@ class LearningSession:
             res.append((self.evaluate(mutations, env, trials, step_fn=None, eval_seq=eval_seq), mutations))
         full_res = [x for batch in MPI.COMM_WORLD.allgather(res) for x in batch]
         self.population = sorted(full_res, reverse=True)
-        self.generation+=1
         return self.population
 
     def traj_segment_generator_eval(self, env, horizon):
