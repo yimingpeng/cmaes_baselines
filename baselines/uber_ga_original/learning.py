@@ -141,12 +141,12 @@ class LearningSession:
                     obs, rew, done, _ = env.step(out['actions'][0])
                     total_rew += rew
                     self.timesteps_so_far += 1
+                rewards.append(total_rew)
                 if record:
-                    self.rewbuffer.append(total_rew)
-                    self.lenbuffer.append(total_rew)
+                    self.rewbuffer.extend(rewards)
+                    self.lenbuffer.extend(rewards)
                     self.result_record()
                     record = False
-                rewards.append(total_rew)
                 self.episodes_so_far += 1
             return sum(rewards) / len(rewards)
 
