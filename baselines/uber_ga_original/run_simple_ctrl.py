@@ -8,7 +8,21 @@ Run with:
 You can change `8` to any value. It effects speed, but not
 sample efficiency.
 """
+import inspect
+import os
+import sys
 
+sys.path.append(
+    os.path.abspath(
+        os.path.join(
+            os.path.abspath(os.path.join(os.getcwd(), os.pardir)), os.pardir)))
+currentdir = os.path.dirname(
+    os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(os.path.dirname(currentdir))
+os.sys.path.insert(0, parentdir)
+
+# very important, don't remove, otherwise pybullet cannot run (reasons are unknown)
+import pybullet_envs
 import gym
 import tensorflow as tf
 
