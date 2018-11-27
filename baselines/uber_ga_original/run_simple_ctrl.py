@@ -53,7 +53,7 @@ def main():
             while True:
                 if generation >= 10000 or learn_sess.timesteps_so_far >= 5e6:
                     break
-                pop = learn_sess.generation(env, trials=5, population=POPULATION)
+                pop = learn_sess.generation(env, trials=1, population=POPULATION)
                 generation+=1
         finally:
             env.close()
