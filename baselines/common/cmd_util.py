@@ -177,10 +177,10 @@ def pybullet_arg_parser():
     parser = arg_parser()
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="AntBulletEnv-v0")
-    parser.add_argument('--env', help='environment ID', type=str,
-                        default="InvertedDoublePendulumBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,
-    #                     default="InvertedPendulumSwingupBulletEnv-v0")
+    #                     default="InvertedDoublePendulumBulletEnv-v0")
+    parser.add_argument('--env', help='environment ID', type=str,
+                        default="InvertedPendulumSwingupBulletEnv-v0")
     # parser.add_argument('--env', help = 'environment ID', type = str,
     #                     default = "InvertedPendulumBulletEnv-v0")
     # parser.add_argument('--env', help='environment ID', type=str,
