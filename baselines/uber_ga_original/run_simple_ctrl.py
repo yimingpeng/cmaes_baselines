@@ -28,7 +28,7 @@ import tensorflow as tf
 
 from baselines import logger
 from baselines.uber_ga_original import LearningSession, simple_mlp, make_session
-from common.cmd_util import make_gym_control_env, gym_ctrl_arg_parser
+from baselines.common.cmd_util import make_gym_control_env, gym_ctrl_arg_parser
 
 POPULATION = 10
 
