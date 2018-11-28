@@ -36,6 +36,7 @@ def train(env_id, num_timesteps, seed):
 def main():
     args = gym_ctrl_arg_parser().parse_args()
     logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "ACKTR-"+args.env)
+    logger.log("Algorithm: ACKTR-"+args.env+"_seed_"+str(args.seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 if __name__ == '__main__':
