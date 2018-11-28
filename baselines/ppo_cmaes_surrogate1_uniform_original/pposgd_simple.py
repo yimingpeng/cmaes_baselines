@@ -16,6 +16,7 @@ test_rewbuffer = deque(maxlen = 100)  # test buffer for episode rewards
 KL_Condition = False
 mean_action_Condition = True
 
+
 def traj_segment_generator_eval(pi, env, horizon, stochastic):
     t = 0
     ob = env.reset()
@@ -310,7 +311,6 @@ def learn(env, policy_fn, *,
     vf_lossandgrad = U.function([ob, ac, ret, lrmult],
                                 vf_losses + [U.flatgrad(vf_loss, vf_var_list)])
 
-
     vf_adam = MpiAdam(vf_var_list, epsilon = adam_epsilon)
     adam = MpiAdam(var_list, epsilon = adam_epsilon)
 
@@ -418,7 +418,7 @@ def learn(env, policy_fn, *,
         # cmean_adapted = max(1.0 - float(timesteps_so_far) / (max_timesteps), 1e-8)
         # cmean_adapted = max(0.8 - float(timesteps_so_far) / (2*max_timesteps), 1e-8)
         # if timesteps_so_far % max_timesteps == 10:
-        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far/(0.5*max_timesteps)), 1))
+        max_v_train_iter = int(max(max_v_train_iter * (1 - timesteps_so_far / (0.5 * max_timesteps)), 1))
         logger.log("********** Iteration %i ************" % iters_so_far)
         if iters_so_far == 0:
             eval_seg = eval_seq.__next__()
@@ -437,6 +437,19 @@ def learn(env, policy_fn, *,
         optim_batchsize = optim_batchsize or ob.shape[0]
 
         if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob)  # update running mean/std for policy
+
+        for _ in range(optim_epochs):
+            for batch in d.iterate_once(optim_batchsize):
+                *vf_loss, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["vtarg"],
+                                             cur_lrmult)
+                vf_adam.update(g, optim_stepsize * cur_lrmult)
+        # for _ in range(optim_epochs):
+        #     losses = []  # list of tuples, each of which gives the loss for a minibatch
+        #     for batch in d.iterate_once(optim_batchsize):
+        #         *newlosses, g = vf_lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+        #         vf_adam.update(g, optim_stepsize * cur_lrmult)
+        #         losses.append(newlosses)
+        #     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         assign_old_eq_new()  # set old parameter values to new parameter values
 
