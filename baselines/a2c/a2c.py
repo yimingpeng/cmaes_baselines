@@ -100,8 +100,7 @@ class Runner(AbstractEnvRunner):
             mb_actions.append(actions)
             mb_values.append(values)
             mb_dones.append(self.dones)
-            if self.env_name == "LunarLanderContinuous-v2":
-                actions = np.clip(actions, -1.0, 1.0)
+            actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
             obs, rewards, dones, _ = self.env.step(actions)
             self.states = states
             self.dones = dones
