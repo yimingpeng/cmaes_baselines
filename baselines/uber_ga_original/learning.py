@@ -138,6 +138,7 @@ class LearningSession:
                         step_fn()
                     out = self.model.step([obs], state)
                     state = out['states']
+                    action = np.clip(out['actions'][0], env.action_space.low, env.action_space.high)
                     obs, rew, done, _ = env.step(out['actions'][0])
                     total_rew += rew
                     self.timesteps_so_far += 1
