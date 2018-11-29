@@ -77,9 +77,9 @@ class KfacOptimizer():
                     factors.append(searchFactors(g, graph))
                 op_names = [item['opName'] for item in factors]
                 # TO-DO: need to check all the attribute of the ops as well
-                print (gradient.name)
-                print (op_names)
-                print (len(np.unique(op_names)))
+                # print (gradient.name)
+                # print (op_names)
+                # print (len(np.unique(op_names)))
                 assert len(np.unique(op_names)) == 1, gradient.name + \
                     ' is shared among different computation OPs'
 
@@ -126,7 +126,8 @@ class KfacOptimizer():
 
         for t, param in zip(g, varlist):
             if KFAC_DEBUG:
-                print(('get factor for '+param.name))
+                # print(('get factor for '+param.name))
+                pass
             factors = searchFactors(t, graph)
             factorTensors[param] = factors
 
@@ -174,7 +175,8 @@ class KfacOptimizer():
 
         if KFAC_DEBUG:
             for items in zip(varlist, fpropTensors, bpropTensors, opTypes):
-                print((items[0].name, factorTensors[item]))
+                # print((items[0].name, factorTensors[item]))
+                pass
         self.factors = factorTensors
         return factorTensors
 
@@ -334,7 +336,8 @@ class KfacOptimizer():
                                 # patches = B x Oh x Ow x (KH xKW x C)
                             if len(SVD_factors) == 0:
                                 if KFAC_DEBUG:
-                                    print(('approx %s act factor with rank-1 SVD factors' % (var.name)))
+                                    pass
+                                    # print(('approx %s act factor with rank-1 SVD factors' % (var.name)))
                                 # find closest rank-1 approx to the feature map
                                 S, U, V = tf.batch_svd(tf.reshape(
                                     fpropFactor, [-1, KH * KW, C]))
@@ -357,7 +360,8 @@ class KfacOptimizer():
 
                             if self._approxT2:
                                 if KFAC_DEBUG:
-                                    print(('approxT2 act fisher for %s' % (var.name)))
+                                    pass
+                                    # print(('approxT2 act fisher for %s' % (var.name)))
                                 # T^2 terms * 1/T^2, size: B x C
                                 fpropFactor = tf.reduce_mean(patches, [1, 2])
                             else:
@@ -398,7 +402,8 @@ class KfacOptimizer():
                         if fpropFactor is not None:
                             if self._approxT2:
                                 if KFAC_DEBUG:
-                                    print(('approxT2 grad fisher for %s' % (var.name)))
+                                    pass
+                                    # print(('approxT2 grad fisher for %s' % (var.name)))
                                 bpropFactor = tf.reduce_sum(
                                     bpropFactor, [1, 2])  # T^2 terms * 1/T^2
                             else:
@@ -409,7 +414,8 @@ class KfacOptimizer():
                             # structure does not apply here. summing over
                             # spatial locations
                             if KFAC_DEBUG:
-                                print(('block diag approx fisher for %s' % (var.name)))
+                                pass
+                                # print(('block diag approx fisher for %s' % (var.name)))
                             bpropFactor = tf.reduce_sum(bpropFactor, [1, 2])
 
                     # assume sampled loss is averaged. TO-DO:figure out better
@@ -546,7 +552,7 @@ class KfacOptimizer():
                 return local_list
 
             def copyStats(var_list):
-                print("copying stats to buffer tensors before eigen decomp")
+                # print("copying stats to buffer tensors before eigen decomp")
                 redundant_stats = {}
                 copied_list = []
                 for item in var_list:
@@ -599,7 +605,7 @@ class KfacOptimizer():
 
     def applyStatsEigen(self, eigen_list):
         updateOps = []
-        print(('updating %d eigenvalue/vectors' % len(eigen_list)))
+        # print(('updating %d eigenvalue/vectors' % len(eigen_list)))
         for i, (tensor, mark) in enumerate(zip(eigen_list, self.eigen_update_list)):
             stats_eigen_var = self.eigen_reverse_lookup[mark]
             updateOps.append(
@@ -696,11 +702,12 @@ class KfacOptimizer():
                 if var in self._weight_decay_dict:
                     weightDecayCoeff = self._weight_decay_dict[var]
                     if KFAC_DEBUG:
-                        print(('weight decay coeff for %s is %f' % (var.name, weightDecayCoeff)))
-
+                        # print(('weight decay coeff for %s is %f' % (var.name, weightDecayCoeff)))
+                        pass
                 if self._factored_damping:
                     if KFAC_DEBUG:
-                        print(('use factored damping for %s' % (var.name)))
+                        # print(('use factored damping for %s' % (var.name)))
+                        pass
                     coeffs = 1.
                     num_factors = len(eigVals)
                     # compute the ratio of two trace norm of the left and right
@@ -772,20 +779,22 @@ class KfacOptimizer():
 
                 grad_dict[var] = grad
 
-        print(('projecting %d gradient matrices' % counter))
+        # print(('projecting %d gradient matrices' % counter))
 
         for g, var in zip(gradlist, varlist):
             grad = grad_dict[var]
             ### clipping ###
             if KFAC_DEBUG:
-                print(('apply clipping to %s' % (var.name)))
+                pass
+                # print(('apply clipping to %s' % (var.name)))
             tf.Print(grad, [tf.sqrt(tf.reduce_sum(tf.pow(grad, 2)))], "Euclidean norm of new grad")
             local_vg = tf.reduce_sum(grad * g * (self._lr * self._lr))
             vg += local_vg
 
         # recale everything
         if KFAC_DEBUG:
-            print('apply vFv clipping')
+            pass
+            # print('apply vFv clipping')
 
         scaling = tf.minimum(1., tf.sqrt(self._clip_kl / vg))
         if KFAC_DEBUG:
@@ -815,7 +824,7 @@ class KfacOptimizer():
         qr = None
         # launch eigen-decomp on a queue thread
         if self._async:
-            print('Use async eigen decomp')
+            # print('Use async eigen decomp')
             # get a list of factor loading tensors
             factorOps_dummy = self.computeStatsEigen()
 

@@ -22,7 +22,7 @@ from baselines import logger
 def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 5
-    gensize = 30 # For each iterationswe
+    gensize = 50 # For each iterationswe
     max_v_train_iter = 10
     bounds = [-5.0, 5.0]
     sigma = 3e-4
@@ -59,7 +59,9 @@ def train(env_id, num_timesteps, seed):
 def main():
     args = pybullet_arg_parser().parse_args()
     logger.configure(format_strs=['stdout', 'log', 'csv'], log_suffix = "PES-S2-"+args.env+"_seed_"+str(args.seed))
-    logger.log("Algorithm: PES-S2-"+args.env+"_seed_"+str(args.seed))
+    import random
+    seed = args.seed + random.randint(0, 2**32-1)
+    logger.log("Algorithm: PES-S2-" + args.env + "_seed_" + str(seed))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

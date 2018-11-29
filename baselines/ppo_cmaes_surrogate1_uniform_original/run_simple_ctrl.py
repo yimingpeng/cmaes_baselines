@@ -58,8 +58,10 @@ def main():
     args = gym_ctrl_arg_parser().parse_args()
     logger.configure(format_strs = ['stdout', 'log', 'csv'],
                      log_suffix = "PES-S2-" + args.env + "_seed_" + str(args.seed))
-    logger.log("Algorithm: PES-S2-" + args.env + "_seed_" + str(args.seed))
-    train(args.env, num_timesteps = args.num_timesteps, seed = args.seed)
+    import random
+    seed = args.seed + random.randint(0, 2**32-1)
+    logger.log("Algorithm: PES-S2-" + args.env + "_seed_" + str(seed))
+    train(args.env, num_timesteps = args.num_timesteps, seed = seed)
 
 
 if __name__ == '__main__':
