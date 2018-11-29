@@ -23,7 +23,7 @@ def train(env_id, num_timesteps, seed):
     max_fitness = -100000
     popsize = 32
     gensize = 10000
-    alpha = 0.01
+    alpha = 0.005
     sigma = 0.1
     eval_iters = 1
     from baselines.openai_es import mlp_policy, es_simple
