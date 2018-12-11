@@ -89,7 +89,7 @@ def make_gym_control_env(env_id, seed):
     """
     set_global_seeds(seed)
     env = gym.make(env_id)
-    # env = Monitor(env, logger.get_dir(), allow_early_resets=True)
+    env = Monitor(env, logger.get_dir(), allow_early_resets=True)
     env.seed(seed)
     return env
 
@@ -159,13 +159,13 @@ def gym_ctrl_arg_parser():
     """
     parser = arg_parser()
     # parser.add_argument('--env', help='environment ID', type=str,
-    #                     default="LunarLander-v2")
+    # #                     default="LunarLander-v2")
     # parser.add_argument('--env', help='environment ID', type=str,
     #                     default="LunarLanderContinuous-v2")
-    # parser.add_argument('--env', help = 'environment ID', type = str,
-    #                     default = "BipedalWalker-v2")
     parser.add_argument('--env', help = 'environment ID', type = str,
-                        default = "BipedalWalkerHardcore-v2")
+                        default = "BipedalWalker-v2")
+    # parser.add_argument('--env', help = 'environment ID', type = str,
+    #                     default = "BipedalWalkerHardcore-v2")
     parser.add_argument('--seed', help = 'RNG seed', type = int, default = 0)
     parser.add_argument('--num-timesteps', type = int, default = int(5e6))
     return parser
